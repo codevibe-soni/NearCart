@@ -564,54 +564,6 @@ export default function About() {
             </p>
           </div>
         </div>
-
-        {/* 7. Technology Section */}
-        <section style={{ marginBottom: '3.5rem' }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary, #0f172a)', marginBottom: '0.3rem' }}>
-              Technology Behind NearCart
-            </h2>
-            <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.875rem' }}>
-              Built using standard, robust web technologies
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              justify: 'center',
-              flexWrap: 'wrap',
-              gap: '0.75rem',
-            }}
-          >
-            {[
-              'React 18 & Vite',
-              'Node.js & Express API',
-              'MongoDB & Mongoose',
-              'Socket.IO Real-time Engine',
-              'Leaflet & OpenStreetMap',
-              'Firebase Cloud Messaging',
-              'Progressive Web App (PWA)',
-            ].map((tech, idx) => (
-              <span
-                key={idx}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '9999px',
-                  background: '#ffffff',
-                  border: '1px solid var(--border-color, #e2e8f0)',
-                  color: 'var(--text-primary, #0f172a)',
-                  fontSize: '0.85rem',
-                  fontWeight: '700',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                }}
-              >
-                ⚡ {tech}
-              </span>
-            ))}
-          </div>
-        </section>
-
         {/* 8. Developer Corner ("Built By") */}
         <section style={{ marginBottom: '2rem' }}>
           <div
