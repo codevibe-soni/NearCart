@@ -110,7 +110,12 @@ const startServer = async () => {
   }
 
   await connectDB();
-
+app.get("/", (req, res) => {
+    res.json({
+        success: true,
+        message: "NearCart Backend is running"
+    });
+});
   httpServer.listen(PORT, () => {
     console.log(`🚀 CampusCart Server running on port ${PORT} (HTTP + Socket.IO)`);
   });
