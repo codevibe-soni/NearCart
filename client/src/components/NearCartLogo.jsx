@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, ShoppingBag } from 'lucide-react';
+// Icon imports removed – using PNG logo
 
 /**
  * NearCart Professional Logo Component
@@ -25,24 +25,7 @@ export default function NearCartLogo({ size = 'medium', showText = true, textCol
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', userSelect: 'none' }}>
-      {/* Icon Mark: Location Pin frame with embedded Shopping Bag */}
-      <div
-        style={{
-          width: dimensions.iconBg,
-          height: dimensions.iconBg,
-          borderRadius: '0.6rem',
-          background: 'linear-gradient(135deg, #0284c7 0%, #3b82f6 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)',
-          position: 'relative',
-          flexShrink: 0,
-        }}
-      >
-        <MapPin style={{ width: '80%', height: '80%', color: 'rgba(255, 255, 255, 0.35)', position: 'absolute' }} />
-        <ShoppingBag style={{ width: dimensions.iconSize, height: dimensions.iconSize, color: '#ffffff', position: 'relative', zIndex: 2 }} />
-      </div>
+      <img src="/logo.png" alt="NearCart logo" style={{ width: dimensions.iconBg, height: dimensions.iconBg }} />
 
       {showText && (
         <span
