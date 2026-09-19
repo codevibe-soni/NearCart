@@ -55,7 +55,7 @@ export default function NearCartLogo({ size = 'medium', showText = true, textCol
               Cart
             </span>
           </span>
-          <span style={{ fontSize: '0.6rem', fontWeight: '300', color: nearColor }}>FoodDisk · Grocery · More</span>
+          <span style={{ fontSize: '0.73rem', fontWeight: '500', color: '#0284c7' }}>FoodDisk · Grocery · More</span>
         </span>
       )}
     </div>
