@@ -6,7 +6,9 @@ import dotenv from 'dotenv';
 
 import connectDB from './config/db.js';
 import { initSocket } from './config/socket.js';
+import cloudinary from './config/cloudinary.js';
 
+// Routes
 import healthRoutes from './routes/healthRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -23,26 +25,39 @@ import reviewRoutes from './routes/reviewRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import {
+  errorHandler,
+  notFoundHandler,
+} from './middleware/errorHandler.js';
 
-// Load environment variables
+// ===============================
+// LOAD ENVIRONMENT VARIABLES
+// ===============================
+
 dotenv.config();
+
+// ===============================
+// EXPRESS APP
+// ===============================
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust reverse proxy (Render, Heroku, Nginx)
+// Trust reverse proxy
 app.set('trust proxy', 1);
 
 // Create HTTP server for Express + Socket.IO
 const httpServer = http.createServer(app);
 
-// CORS configuration
+// ===============================
+// CORS
+// ===============================
+
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
-  'https://campusmar.netlify.app',
+  'https://near-cart.netlify.app',
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
@@ -95,7 +110,7 @@ app.use(cookieParser());
 initSocket(httpServer, corsOptions);
 
 // ===============================
-// ROOT / HEALTH ROUTE
+// ROOT ROUTE
 // ===============================
 
 app.get('/', (req, res) => {
@@ -140,8 +155,32 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
 // ===============================
+// TEMPORARY CLOUDINARY TEST
+// ===============================
+
+app.get('/api/cloudinary-test', async (req, res) => {
+  try {
+    const result = await cloudinary.api.ping();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cloudinary connected successfully',
+      result,
+    });
+  } catch (error) {
+    console.error('Cloudinary error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Cloudinary connection failed',
+      error: error.message,
+    });
+  }
+});
+
+// ===============================
 // 404 ROUTE HANDLER
-// IMPORTANT: Keep this AFTER all routes
+// IMPORTANT: MUST BE AFTER ALL ROUTES
 // ===============================
 
 app.use(notFoundHandler);
