@@ -8,7 +8,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 30000,
+ timeout: 86400000, // 24 hours,
 });
 
 // Response interceptor for error handling without crashing application
