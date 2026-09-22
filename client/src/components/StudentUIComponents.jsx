@@ -194,7 +194,9 @@ export function ShopCard({ shop, onClick }) {
           </div>
           <div>
             <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>{shop.name}</h4>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{shop.category?.name || 'General Store'}</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              {shop.category?.name || 'General Store'}{shop.foodType ? ` • ${shop.foodType}` : ''}
+            </span>
           </div>
         </div>
 
@@ -371,6 +373,12 @@ export const ProductCard = React.memo(function ProductCard({ product, onClick, o
       {product.gstPercentage > 0 && (
         <span style={{ fontSize: '0.625rem', color: '#475569', background: '#f1f5f9', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', marginBottom: '0.35rem', display: 'inline-block', width: 'fit-content' }}>
           incl. {product.gstPercentage}% GST
+        </span>
+      )}
+
+      {Number(product.packingCharges) > 0 && (
+        <span style={{ fontSize: '0.625rem', color: '#0369a1', background: '#e0f2fe', padding: '0.1rem 0.35rem', borderRadius: '0.2rem', marginBottom: '0.35rem', display: 'inline-block', width: 'fit-content' }}>
+          Packing: ₹{product.packingCharges} / item
         </span>
       )}
 

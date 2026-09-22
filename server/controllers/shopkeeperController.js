@@ -4,6 +4,54 @@ import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import Notification from '../models/Notification.js';
 import Coupon from '../models/Coupon.js';
+import { validateDeliveryChargeSlabs } from '../utils/distanceCalculator.js';
+import { uploadBase64Image, generateCloudinarySignature } from '../services/cloudinaryService.js';
+import { assertNoBase64Image } from '../utils/imageGuard.js';
+
+// @route   POST /api/shopkeeper/cloudinary/sign
+// @desc    Generate server-side signed Cloudinary upload parameters for shopkeepers
+// @access  Private/Shopkeeper
+export const getCloudinarySignature = async (req, res, next) => {
+  try {
+    const folder = req.body.folder || 'nearcart/products';
+    const params = generateCloudinarySignature(folder);
+    return res.status(200).json({
+      success: true,
+      ...params,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate upload signature',
+    });
+  }
+};
+
+/**
+ * Upload Base64 Data URLs in product images array to Cloudinary when configured.
+ * Safely falls back to preserving original Base64 strings if Cloudinary is not configured or upload fails.
+ */
+const processImagesForStorage = async (imagesArray, folder = 'nearcart/products') => {
+  if (!Array.isArray(imagesArray) || imagesArray.length === 0) return [];
+
+  const uploadPromises = imagesArray.map(async (img) => {
+    if (!img) return null;
+    if (typeof img === 'string' && img.startsWith('data:image/')) {
+      const res = await uploadBase64Image(img, { folder });
+      if (res.success && res.url && typeof res.url === 'string' && (res.url.startsWith('https://res.cloudinary.com/') || res.url.startsWith('http://') || res.url.startsWith('https://')) && !res.url.startsWith('data:image/')) {
+        return res.url;
+      }
+      throw new Error(`Cloudinary image upload failed: ${res.error || 'Upload error'}. Base64 storage is strictly prohibited.`);
+    } else if (typeof img === 'string' && (img.startsWith('http://') || img.startsWith('https://'))) {
+      return img;
+    } else {
+      throw new Error('Invalid image format: Must be a valid HTTP/HTTPS URL or Base64 data string.');
+    }
+  });
+
+  const results = await Promise.all(uploadPromises);
+  return results.filter(Boolean);
+};
 
 /**
  * Helper to fetch a shop and enforce ownership check if shopId is provided.
@@ -138,14 +186,37 @@ export const createShop = async (req, res, next) => {
       closingTime,
       minimumOrderAmount,
       deliveryFee,
+      packingCharges,
       logo,
       coverImage,
+      foodType,
+      customFoodType,
     } = req.body;
 
     if (!name || !category || !address) {
       return res.status(400).json({
         success: false,
         message: 'Shop name, category, and address are required.',
+      });
+    }
+
+    let finalFoodType = '';
+    if (foodType === 'Custom') {
+      finalFoodType = customFoodType ? customFoodType.trim() : '';
+      if (!finalFoodType) {
+        return res.status(400).json({
+          success: false,
+          message: 'Custom food type is required and cannot be empty.',
+        });
+      }
+    } else if (foodType) {
+      finalFoodType = foodType.trim();
+    }
+
+    if (finalFoodType.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Food type cannot exceed 50 characters.',
       });
     }
 
@@ -168,7 +239,32 @@ export const createShop = async (req, res, next) => {
       }
     }
 
+    const shopIdTemp = new mongoose.Types.ObjectId();
+    let finalLogo = logo || '';
+    let finalCover = coverImage || '';
+
+    if (typeof finalLogo === 'string' && finalLogo.startsWith('data:image/')) {
+      const uploadRes = await uploadBase64Image(finalLogo, { folder: `nearcart/shops/${shopIdTemp}/logo`, public_id: `logo_${shopIdTemp}`, overwrite: true });
+      if (uploadRes.success && uploadRes.url && !uploadRes.url.startsWith('data:image/')) {
+        finalLogo = uploadRes.url;
+      } else {
+        return res.status(400).json({ success: false, message: 'Cloudinary upload failed for logo. Base64 storage is not allowed.' });
+      }
+    }
+
+    if (typeof finalCover === 'string' && finalCover.startsWith('data:image/')) {
+      const uploadRes = await uploadBase64Image(finalCover, { folder: `nearcart/shops/${shopIdTemp}/cover`, public_id: `coverImage_${shopIdTemp}`, overwrite: true });
+      if (uploadRes.success && uploadRes.url && !uploadRes.url.startsWith('data:image/')) {
+        finalCover = uploadRes.url;
+      } else {
+        return res.status(400).json({ success: false, message: 'Cloudinary upload failed for cover image. Base64 storage is not allowed.' });
+      }
+    }
+
+    assertNoBase64Image({ logo: finalLogo, coverImage: finalCover }, 'Shop images');
+
     const shop = await Shop.create({
+      _id: shopIdTemp,
       name: name.trim(),
       description: description ? description.trim() : '',
       phone: phone ? phone.trim() : '',
@@ -179,8 +275,10 @@ export const createShop = async (req, res, next) => {
       closingTime: finalClose,
       minimumOrderAmount: Number(minimumOrderAmount) || 0,
       deliveryFee: Number(deliveryFee) || 0,
-      logo: logo || '',
-      coverImage: coverImage || '',
+      packingCharges: packingCharges !== undefined ? Math.max(0, Number(packingCharges) || 0) : 0,
+      logo: finalLogo,
+      coverImage: finalCover,
+      foodType: finalFoodType,
       isApproved: true, // Auto approve for convenience in development
       isActive: true,
       isOpen: true,
@@ -237,13 +335,54 @@ export const updateShop = async (req, res, next) => {
       closingTime,
       minimumOrderAmount,
       deliveryFee,
+      deliveryChargeSlabs,
+      packingCharges,
       logo,
       coverImage,
       isOpen,
       upiEnabled,
       upiId,
       upiQrImage,
+      latitude,
+      longitude,
+      location,
+      foodType,
+      customFoodType,
     } = req.body;
+
+    // Validate delivery charge slabs if provided
+    if (deliveryChargeSlabs !== undefined) {
+      const slabError = validateDeliveryChargeSlabs(deliveryChargeSlabs);
+      if (slabError) {
+        return res.status(400).json({
+          success: false,
+          message: slabError,
+        });
+      }
+    }
+
+    if (foodType !== undefined || customFoodType !== undefined) {
+      let finalFoodType = '';
+      if (foodType === 'Custom') {
+        finalFoodType = customFoodType ? customFoodType.trim() : '';
+        if (!finalFoodType) {
+          return res.status(400).json({
+            success: false,
+            message: 'Custom food type is required and cannot be empty.',
+          });
+        }
+      } else if (foodType) {
+        finalFoodType = foodType.trim();
+      }
+
+      if (finalFoodType.length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Food type cannot exceed 50 characters.',
+        });
+      }
+      shop.foodType = finalFoodType;
+    }
 
     const newOpen = openingTime !== undefined ? (openingTime && openingTime.trim() ? openingTime.trim() : null) : shop.openingTime;
     const newClose = closingTime !== undefined ? (closingTime && closingTime.trim() ? closingTime.trim() : null) : shop.closingTime;
@@ -273,12 +412,62 @@ export const updateShop = async (req, res, next) => {
     shop.closingTime = newClose;
     if (minimumOrderAmount !== undefined) shop.minimumOrderAmount = Number(minimumOrderAmount);
     if (deliveryFee !== undefined) shop.deliveryFee = Number(deliveryFee);
-    if (logo !== undefined) shop.logo = logo;
-    if (coverImage !== undefined) shop.coverImage = coverImage;
+    if (deliveryChargeSlabs !== undefined) shop.deliveryChargeSlabs = deliveryChargeSlabs;
+    if (packingCharges !== undefined) shop.packingCharges = Math.max(0, Number(packingCharges) || 0);
+    if (logo !== undefined) {
+      if (typeof logo === 'string' && logo.startsWith('data:image/')) {
+        const uploadRes = await uploadBase64Image(logo, { folder: `nearcart/shops/${shop._id}/logo`, public_id: `logo_${shop._id}`, overwrite: true });
+        if (uploadRes.success && uploadRes.url && !uploadRes.url.startsWith('data:image/')) {
+          shop.logo = uploadRes.url;
+        } else {
+          return res.status(400).json({ success: false, message: 'Cloudinary upload failed for logo. Base64 storage is not allowed.' });
+        }
+      } else {
+        shop.logo = logo;
+      }
+    }
+    if (coverImage !== undefined) {
+      if (typeof coverImage === 'string' && coverImage.startsWith('data:image/')) {
+        const uploadRes = await uploadBase64Image(coverImage, { folder: `nearcart/shops/${shop._id}/cover`, public_id: `coverImage_${shop._id}`, overwrite: true });
+        if (uploadRes.success && uploadRes.url && !uploadRes.url.startsWith('data:image/')) {
+          shop.coverImage = uploadRes.url;
+        } else {
+          return res.status(400).json({ success: false, message: 'Cloudinary upload failed for cover image. Base64 storage is not allowed.' });
+        }
+      } else {
+        shop.coverImage = coverImage;
+      }
+    }
     if (isOpen !== undefined) shop.isOpen = Boolean(isOpen);
     if (upiEnabled !== undefined) shop.upiEnabled = Boolean(upiEnabled);
     if (upiId !== undefined) shop.upiId = upiId.trim();
-    if (upiQrImage !== undefined) shop.upiQrImage = upiQrImage;
+    if (upiQrImage !== undefined) {
+      if (typeof upiQrImage === 'string' && upiQrImage.startsWith('data:image/')) {
+        const uploadRes = await uploadBase64Image(upiQrImage, { folder: `nearcart/shops/${shop._id}/upi-qr`, public_id: `upiQrImage_${shop._id}`, overwrite: true });
+        if (uploadRes.success && uploadRes.url && !uploadRes.url.startsWith('data:image/')) {
+          shop.upiQrImage = uploadRes.url;
+          if (uploadRes.public_id) shop.upiQrPublicId = uploadRes.public_id;
+        } else {
+          return res.status(400).json({ success: false, message: 'Cloudinary upload failed for UPI QR image. Base64 storage is not allowed.' });
+        }
+      } else {
+        shop.upiQrImage = upiQrImage;
+      }
+    }
+
+    assertNoBase64Image({ logo: shop.logo, coverImage: shop.coverImage, upiQrImage: shop.upiQrImage }, 'Shop update images');
+
+    if (location && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+      shop.location = {
+        type: 'Point',
+        coordinates: [Number(location.coordinates[0]), Number(location.coordinates[1])],
+      };
+    } else if (latitude !== undefined && longitude !== undefined) {
+      shop.location = {
+        type: 'Point',
+        coordinates: [Number(longitude), Number(latitude)],
+      };
+    }
 
     await shop.save();
 
@@ -306,8 +495,11 @@ export const getShopkeeperProducts = async (req, res, next) => {
     }
 
     const products = await Product.find({ shop: shop._id })
+      .select('name description category price discountPrice unit stock sku isAvailable isActive rating totalRatings gstPercentage packingCharges variantName createdAt updatedAt images')
+      .slice('images', 1)
       .populate('category', 'name')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -347,7 +539,210 @@ export const createProduct = async (req, res, next) => {
       isAvailable,
       images,
       gstPercentage,
+      packingCharges,
+      idempotencyKey,
+      variants,
     } = req.body;
+
+    const key = idempotencyKey || req.headers['x-idempotency-key'] || null;
+
+    const processedImages = await processImagesForStorage(Array.isArray(images) ? images : []);
+
+    assertNoBase64Image(processedImages, 'product images');
+
+    // Multi-variant product creation flow
+    if (Array.isArray(variants) && variants.length > 0) {
+      if (!name || !category || !unit) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product name, category, and unit are required.',
+        });
+      }
+
+      // Idempotency check for multi-variant
+      if (key) {
+        const existingKeyProducts = await Product.find({
+          shop: shop._id,
+          idempotencyKey: { $regex: `^${key}` },
+        }).sort({ createdAt: 1 });
+
+        if (existingKeyProducts.length >= variants.length) {
+          return res.status(200).json({
+            success: true,
+            message: `${existingKeyProducts.length} product${existingKeyProducts.length > 1 ? 's' : ''} added successfully.`,
+            count: existingKeyProducts.length,
+            products: existingKeyProducts,
+          });
+        }
+      }
+
+      // Validate variants array
+      const variantNamesSeen = new Set();
+      const validatedVariants = [];
+
+      for (let i = 0; i < variants.length; i++) {
+        const v = variants[i];
+        const vName = (v.name || v.variantName || '').trim();
+        if (!vName) {
+          return res.status(400).json({
+            success: false,
+            message: 'Variant name is required for all selected options.',
+          });
+        }
+
+        const lowerVName = vName.toLowerCase();
+        if (variantNamesSeen.has(lowerVName)) {
+          return res.status(400).json({
+            success: false,
+            message: `Duplicate variant name "${vName}" is not allowed in the same submission.`,
+          });
+        }
+        variantNamesSeen.add(lowerVName);
+
+        if (v.price === undefined || v.price === '' || isNaN(Number(v.price))) {
+          return res.status(400).json({
+            success: false,
+            message: `Valid price is required for variant "${vName}".`,
+          });
+        }
+        const vPrice = Number(v.price);
+        if (vPrice < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Price for variant "${vName}" cannot be negative.`,
+          });
+        }
+
+        const vStock = v.stock !== undefined && v.stock !== '' ? Number(v.stock) : (Number(stock) || 0);
+        if (vStock < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Stock for variant "${vName}" cannot be negative.`,
+          });
+        }
+
+        const vPackingCharges = v.packingCharges !== undefined && v.packingCharges !== ''
+          ? Math.max(0, Number(v.packingCharges) || 0)
+          : (packingCharges !== undefined && packingCharges !== '' ? Math.max(0, Number(packingCharges) || 0) : 0);
+
+        if (vPackingCharges < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Packing charges for variant "${vName}" cannot be negative.`,
+          });
+        }
+
+        const vImages = Array.isArray(v.images) && v.images.length > 0 ? await processImagesForStorage(v.images) : processedImages;
+        assertNoBase64Image(vImages, `variant images for "${vName}"`);
+
+        validatedVariants.push({
+          name: vName,
+          price: vPrice,
+          stock: vStock,
+          packingCharges: vPackingCharges,
+          images: vImages,
+        });
+      }
+
+      // Helper to generate formatted display name
+      const formatProductName = (base, variant) => {
+        const trimmedBase = base.trim();
+        const trimmedVariant = variant.trim();
+        const lowerBase = trimmedBase.toLowerCase();
+        const lowerVariant = trimmedVariant.toLowerCase();
+
+        if (lowerBase.endsWith(` - ${lowerVariant}`) || lowerBase.endsWith(`-${lowerVariant}`)) {
+          return trimmedBase;
+        }
+        if (lowerBase === lowerVariant) {
+          return trimmedBase;
+        }
+        return `${trimmedBase} - ${trimmedVariant}`;
+      };
+
+      // Create variants using transaction if supported, else safe batch
+      let session = null;
+      let useTransaction = false;
+      try {
+        session = await mongoose.startSession();
+        session.startTransaction();
+        useTransaction = true;
+      } catch (e) {
+        session = null;
+        useTransaction = false;
+      }
+
+      const createdProducts = [];
+      try {
+        for (let i = 0; i < validatedVariants.length; i++) {
+          const v = validatedVariants[i];
+          const fullProductName = formatProductName(name, v.name);
+          const varIdempotencyKey = key ? `${key}_${i}_${v.name.replace(/\s+/g, '_')}` : undefined;
+
+          const prodData = {
+            shop: shop._id,
+            category,
+            name: fullProductName,
+            variantName: v.name,
+            description: description ? description.trim() : '',
+            price: v.price,
+            unit: unit.trim(),
+            stock: v.stock,
+            isAvailable: v.stock > 0,
+            images: v.images || processedImages,
+            gstPercentage: gstPercentage !== undefined && gstPercentage !== '' ? Math.min(100, Math.max(0, Number(gstPercentage) || 0)) : 0,
+            packingCharges: v.packingCharges,
+            ...(varIdempotencyKey ? { idempotencyKey: varIdempotencyKey } : {}),
+            isActive: true,
+          };
+
+          assertNoBase64Image(prodData.images, 'variant images');
+
+          let created;
+          if (useTransaction && session) {
+            const [doc] = await Product.create([prodData], { session });
+            created = doc;
+          } else {
+            created = await Product.create(prodData);
+          }
+          createdProducts.push(created);
+        }
+
+        if (useTransaction && session) {
+          await session.commitTransaction();
+          session.endSession();
+        }
+
+        const count = createdProducts.length;
+        return res.status(201).json({
+          success: true,
+          message: `${count} product${count > 1 ? 's' : ''} added successfully.`,
+          count,
+          products: createdProducts,
+        });
+      } catch (batchErr) {
+        if (useTransaction && session) {
+          await session.abortTransaction();
+          session.endSession();
+        } else if (createdProducts.length > 0) {
+          const createdIds = createdProducts.map((p) => p._id);
+          await Product.deleteMany({ _id: { $in: createdIds } });
+        }
+        throw batchErr;
+      }
+    }
+
+    // Single product creation flow (existing)
+    if (key) {
+      const existingProduct = await Product.findOne({ shop: shop._id, idempotencyKey: key });
+      if (existingProduct) {
+        return res.status(200).json({
+          success: true,
+          message: 'Product created successfully',
+          product: existingProduct,
+        });
+      }
+    }
 
     if (!name || price === undefined || !category || !unit) {
       return res.status(400).json({
@@ -367,6 +762,13 @@ export const createProduct = async (req, res, next) => {
       });
     }
 
+    if (packingCharges !== undefined && Number(packingCharges) < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Packing charges cannot be negative.',
+      });
+    }
+
     if (numDiscount !== undefined && (numDiscount < 0 || numDiscount > numPrice)) {
       return res.status(400).json({
         success: false,
@@ -374,27 +776,45 @@ export const createProduct = async (req, res, next) => {
       });
     }
 
-    const product = await Product.create({
-      shop: shop._id,
-      category,
-      name: name.trim(),
-      description: description ? description.trim() : '',
-      price: numPrice,
-      discountPrice: numDiscount,
-      unit: unit.trim(),
-      stock: numStock,
-      sku: sku ? sku.trim() : '',
-      isAvailable: isAvailable !== undefined ? isAvailable : numStock > 0,
-      images: Array.isArray(images) ? images : [],
-      gstPercentage: gstPercentage !== undefined && gstPercentage !== '' ? Math.min(100, Math.max(0, Number(gstPercentage) || 0)) : 0,
-      isActive: true,
-    });
+    try {
+      assertNoBase64Image(processedImages, 'single product images');
+      const product = await Product.create({
+        shop: shop._id,
+        category,
+        name: name.trim(),
+        variantName: req.body.variantName ? req.body.variantName.trim() : '',
+        description: description ? description.trim() : '',
+        price: numPrice,
+        discountPrice: numDiscount,
+        unit: unit.trim(),
+        stock: numStock,
+        sku: sku ? sku.trim() : '',
+        isAvailable: isAvailable !== undefined ? isAvailable : numStock > 0,
+        images: processedImages,
+        gstPercentage: gstPercentage !== undefined && gstPercentage !== '' ? Math.min(100, Math.max(0, Number(gstPercentage) || 0)) : 0,
+        packingCharges: packingCharges !== undefined && packingCharges !== '' ? Math.max(0, Number(packingCharges) || 0) : 0,
+        ...(key ? { idempotencyKey: key } : {}),
+        isActive: true,
+      });
 
-    res.status(201).json({
-      success: true,
-      message: 'Product created successfully',
-      product,
-    });
+      return res.status(201).json({
+        success: true,
+        message: 'Product created successfully',
+        product,
+      });
+    } catch (createErr) {
+      if (createErr.code === 11000 && key) {
+        const existingProduct = await Product.findOne({ shop: shop._id, idempotencyKey: key });
+        if (existingProduct) {
+          return res.status(200).json({
+            success: true,
+            message: 'Product created successfully',
+            product: existingProduct,
+          });
+        }
+      }
+      throw createErr;
+    }
   } catch (error) {
     next(error);
   }
@@ -439,10 +859,16 @@ export const updateProduct = async (req, res, next) => {
       isAvailable,
       images,
       gstPercentage,
+      packingCharges,
+      variantName,
     } = req.body;
 
     if (price !== undefined && Number(price) < 0) {
       return res.status(400).json({ success: false, message: 'Price cannot be negative' });
+    }
+
+    if (packingCharges !== undefined && Number(packingCharges) < 0) {
+      return res.status(400).json({ success: false, message: 'Packing charges cannot be negative' });
     }
 
     if (stock !== undefined && Number(stock) < 0) {
@@ -450,6 +876,7 @@ export const updateProduct = async (req, res, next) => {
     }
 
     if (name) product.name = name.trim();
+    if (variantName !== undefined) product.variantName = variantName ? variantName.trim() : '';
     if (description !== undefined) product.description = description.trim();
     if (category) product.category = category;
     if (price !== undefined) product.price = Number(price);
@@ -460,12 +887,17 @@ export const updateProduct = async (req, res, next) => {
     if (stock !== undefined) product.stock = Number(stock);
     if (sku !== undefined) product.sku = sku.trim();
     if (isAvailable !== undefined) product.isAvailable = isAvailable;
-    if (images && Array.isArray(images)) product.images = images;
+    if (images && Array.isArray(images)) {
+      product.images = await processImagesForStorage(images);
+    }
     if (gstPercentage !== undefined) product.gstPercentage = Math.min(100, Math.max(0, Number(gstPercentage) || 0));
+    if (packingCharges !== undefined) product.packingCharges = Math.max(0, Number(packingCharges) || 0);
 
     if (product.stock === 0) {
       product.isAvailable = false;
     }
+
+    assertNoBase64Image(product.images, 'product update images');
 
     await product.save();
 

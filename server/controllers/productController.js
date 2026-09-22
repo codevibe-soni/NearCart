@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Product from '../models/Product.js';
 import Shop from '../models/Shop.js';
+import Category from '../models/Category.js';
 
 // @route   GET /api/products
 // @desc    Get active & available products with filters, search, sorting & pagination
@@ -32,31 +33,50 @@ export const getProducts = async (req, res, next) => {
       shop: { $in: activeShopIds },
     };
 
-    if (shop) {
-      if (!mongoose.Types.ObjectId.isValid(shop)) {
-        return res.status(400).json({ success: false, message: 'Invalid shop ID format' });
-      }
-      const isShopActive = activeShopIds.some((id) => id.toString() === shop.toString());
-      if (!isShopActive) {
-        return res.status(200).json({
-          success: true,
-          products: [],
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: 0,
-            totalPages: 1,
-          },
-        });
-      }
-      query.shop = shop;
+    // Enforce Shop-First policy: Products are only retrieved for a specific shop
+    if (!shop) {
+      return res.status(200).json({
+        success: true,
+        products: [],
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: 0,
+          totalPages: 1,
+        },
+      });
     }
+
+    if (!mongoose.Types.ObjectId.isValid(shop)) {
+      return res.status(400).json({ success: false, message: 'Invalid shop ID format' });
+    }
+    const isShopActive = activeShopIds.some((id) => id.toString() === shop.toString());
+    if (!isShopActive) {
+      return res.status(200).json({
+        success: true,
+        products: [],
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: 0,
+          totalPages: 1,
+        },
+      });
+    }
+    query.shop = shop;
 
     if (category) {
       if (mongoose.Types.ObjectId.isValid(category)) {
         query.category = category;
       } else {
-        return res.status(400).json({ success: false, message: 'Invalid category ID format' });
+        const catDoc = await Category.findOne({
+          name: new RegExp(`^${category.trim()}`, 'i'),
+        });
+        if (catDoc) {
+          query.category = catDoc._id;
+        } else {
+          query.category = new mongoose.Types.ObjectId();
+        }
       }
     }
 
@@ -78,8 +98,8 @@ export const getProducts = async (req, res, next) => {
 
     const total = await Product.countDocuments(query);
     const products = await Product.find(query)
-      .select('name price discountPrice unit stock images shop category rating totalRatings gstPercentage createdAt')
-      .populate('shop', 'name logo rating address isOpen deliveryFee')
+      .select('name price discountPrice unit stock images shop category rating totalRatings gstPercentage packingCharges createdAt')
+      .populate('shop', 'name logo rating address isOpen deliveryFee deliveryChargeSlabs')
       .populate('category', 'name')
       .sort(sortOptions)
       .skip(skip)
@@ -122,7 +142,7 @@ export const getProductById = async (req, res, next) => {
     })
       .populate({
         path: 'shop',
-        select: 'name description logo rating totalRatings address phone isOpen isApproved isActive deliveryFee upiEnabled upiId upiQrImage',
+        select: 'name description logo rating totalRatings address phone isOpen isApproved isActive deliveryFee deliveryChargeSlabs upiEnabled upiId upiQrImage',
         match: { isApproved: true, isActive: true },
       })
       .populate('category', 'name image');

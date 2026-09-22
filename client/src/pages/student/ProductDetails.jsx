@@ -73,21 +73,22 @@ export default function ProductDetails() {
     //   shop: product.shop,
     // };
     const buyNowItem = {
-  product: {
-    _id: product._id,
-    name: product.name,
-    price: product.price,
-    discountPrice: product.discountPrice,
-    images: product.images,
-    unit: product.unit,
-    stock: product.stock,
-    gstPercentage: Number(product.gstPercentage) || 0,
-    shop: product.shop,
-  },
-  quantity: selectedQuantity,
-  effectivePrice,
-  shop: product.shop,
-};
+      product: {
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        discountPrice: product.discountPrice,
+        images: product.images,
+        unit: product.unit,
+        stock: product.stock,
+        gstPercentage: Number(product.gstPercentage) || 0,
+        packingCharges: Number(product.packingCharges) || 0,
+        shop: product.shop,
+      },
+      quantity: selectedQuantity,
+      effectivePrice,
+      shop: product.shop,
+    };
 
     navigate('/checkout', { state: { buyNowItem } });
   };
@@ -339,6 +340,15 @@ export default function ProductDetails() {
             <div style={{ marginBottom: '0.75rem' }}>
               <span style={{ fontSize: '0.8rem', color: '#6b7280', background: '#f3f4f6', padding: '0.2rem 0.6rem', borderRadius: '0.25rem', display: 'inline-block' }}>
                 Price inclusive of {product.gstPercentage}% GST
+              </span>
+            </div>
+          )}
+
+          {/* Packing Charges Info */}
+          {Number(product.packingCharges) > 0 && (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#0369a1', background: '#e0f2fe', padding: '0.25rem 0.65rem', borderRadius: '0.25rem', display: 'inline-block' }}>
+                Packing: ₹{product.packingCharges} / item
               </span>
             </div>
           )}

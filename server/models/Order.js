@@ -28,11 +28,16 @@ const orderItemSchema = new mongoose.Schema(
     },
 
   gstPercentage: {
-  type: Number,
-  default: 0,
-  min: [0, 'GST percentage cannot be negative'],
-  max: [100, 'GST percentage cannot exceed 100'],
-},
+    type: Number,
+    default: 0,
+    min: [0, 'GST percentage cannot be negative'],
+    max: [100, 'GST percentage cannot exceed 100'],
+  },
+  packingCharges: {
+    type: Number,
+    default: 0,
+    min: [0, 'Item packing charges cannot be negative'],
+  },
   },
   { _id: true }
 );
@@ -79,6 +84,16 @@ const orderSchema = new mongoose.Schema(
       required: [true, 'Delivery fee is required'],
       min: [0, 'Delivery fee cannot be negative'],
     },
+    deliveryDistance: {
+      type: Number,
+      default: null,
+      min: [0, 'Delivery distance cannot be negative'],
+    },
+    packingCharges: {
+      type: Number,
+      default: 0,
+      min: [0, 'Packing charges cannot be negative'],
+    },
     discount: {
       type: Number,
       default: 0,
@@ -89,6 +104,11 @@ const orderSchema = new mongoose.Schema(
   default: 0,
   min: [0, 'GST amount cannot be negative'],
 },
+    idempotencyKey: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     totalAmount: {
       type: Number,
       required: [true, 'Total amount is required'],
@@ -154,6 +174,7 @@ orderSchema.index({ user: 1 });
 orderSchema.index({ shop: 1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ createdAt: -1 });
+orderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 

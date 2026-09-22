@@ -8,7 +8,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "create-admin": "node scripts/createAdmin.js",
-    "seed-categories": "node seed_categories.js"
+    "seed-categories": "node seed_categories.js",
+    "migrate:product-images": "node scripts/migrateProductImagesToCloudinary.js",
+    "cleanup:migrated-base64": "node scripts/cleanupMigratedBase64.js"
   },
   "keywords": [
     "campuscart",

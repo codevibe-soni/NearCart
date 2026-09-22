@@ -1,53 +1,109 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getShopById, getProducts } from '../../services/studentService';
-import { ProductCard, LoadingSpinner, EmptyState, SearchBar, formatTimeAMPM, isShopOpen } from '../../components/StudentUIComponents';
-import { Store, ArrowLeft, Phone, MapPin, Star, Clock } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { getShopById, getProducts, getCategories } from '../../services/studentService';
+import { ProductCard, LoadingSpinner, EmptyState, SearchBar, CategoryCard, formatTimeAMPM, isShopOpen } from '../../components/StudentUIComponents';
+import { Store, ArrowLeft, Phone, MapPin, Star, Clock, Tag } from 'lucide-react';
+import api from '../../services/api';
 
 export default function ShopDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialCat = searchParams.get('category') || '';
+  const initialSearch = searchParams.get('search') || '';
 
   const [shop, setShop] = useState(null);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(initialCat);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 24 });
-  const [searchInput, setSearchInput] = useState('');
-  const [submittedSearch, setSubmittedSearch] = useState('');
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchShopData = async (activeQuery = submittedSearch) => {
+  // When shop ID changes, immediately reset shop and product state to avoid stale flash
+  useEffect(() => {
+    setShop(null);
+    setProducts([]);
     setLoading(true);
+  }, [id]);
+
+  // Sync category & search state from URL search parameters
+  useEffect(() => {
+    const cat = searchParams.get('category') || '';
+    const q = searchParams.get('search') || '';
+    if (cat !== selectedCategory) setSelectedCategory(cat);
+    if (q !== submittedSearch) {
+      setSubmittedSearch(q);
+      setSearchInput(q);
+    }
+  }, [searchParams]);
+
+  const updateUrlParams = (catVal, searchVal) => {
+    const params = {};
+    if (catVal) params.category = catVal;
+    if (searchVal) params.search = searchVal;
+    setSearchParams(params);
+  };
+
+  const fetchShopData = async (activeCat = selectedCategory, activeQuery = submittedSearch, activePage = page) => {
+    if (!shop) setLoading(true);
+    else setProductsLoading(true);
     setError('');
+
     try {
-      const [shopRes, prodRes] = await Promise.all([
+      const prodParams = {
+        shop: id,
+        page: activePage,
+        limit: 24,
+      };
+      if (activeQuery) prodParams.search = activeQuery.trim();
+      if (activeCat) prodParams.category = activeCat;
+
+      const [shopRes, prodRes, catRes] = await Promise.all([
         getShopById(id),
-        getProducts({ shop: id, search: activeQuery ? activeQuery.trim() : '', page, limit: 24 }),
+        getProducts(prodParams),
+        getCategories(),
       ]);
 
-      if (shopRes.success) {
+      if (shopRes && shopRes.success) {
         setShop(shopRes.shop);
       }
-      if (prodRes.success) {
-        setProducts(prodRes.products);
+      if (prodRes && prodRes.success) {
+        setProducts(prodRes.products || []);
         if (prodRes.pagination) setPagination(prodRes.pagination);
+      }
+      if (catRes && catRes.success) {
+        setCategories(catRes.categories || []);
       }
     } catch (err) {
       setError(err.message || 'Shop is currently unavailable.');
     } finally {
       setLoading(false);
+      setProductsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchShopData(submittedSearch);
-  }, [id, submittedSearch, page]);
+    fetchShopData(selectedCategory, submittedSearch, page);
+  }, [id, selectedCategory, submittedSearch, page]);
+
+  const handleCategorySelect = (catId) => {
+    const nextCat = selectedCategory === catId ? '' : catId;
+    setPage(1);
+    setSelectedCategory(nextCat);
+    updateUrlParams(nextCat, submittedSearch);
+  };
 
   const handleSearchSubmit = (query) => {
     const finalQuery = (query !== undefined ? query : searchInput).trim();
     setPage(1);
     setSubmittedSearch(finalQuery);
+    updateUrlParams(selectedCategory, finalQuery);
   };
 
   const handleSearchInputChange = (val) => {
@@ -55,10 +111,11 @@ export default function ShopDetails() {
     if (val.trim() === '' && submittedSearch !== '') {
       setPage(1);
       setSubmittedSearch('');
+      updateUrlParams(selectedCategory, '');
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading && !shop) return <LoadingSpinner message="Loading shop catalog..." />;
 
   if (error || !shop) {
     return (
@@ -79,14 +136,19 @@ export default function ShopDetails() {
   const openTimeFormatted = hasTiming ? formatTimeAMPM(shop.openingTime) : '';
   const closeTimeFormatted = hasTiming ? formatTimeAMPM(shop.closingTime) : '';
 
+  const selectedCategoryObj = categories.find(
+    (c) => c._id === selectedCategory || c.name.toLowerCase() === selectedCategory.toLowerCase()
+  );
+  const categoryTitle = selectedCategoryObj ? selectedCategoryObj.name : 'Category Items';
+
   return (
     <div className="container" style={{ padding: '2.5rem 1.5rem 5rem 1.5rem' }}>
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate('/student')}
         className="btn-secondary"
         style={{ marginBottom: '1.5rem', padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
       >
-        <ArrowLeft size={16} /> Back
+        <ArrowLeft size={16} /> Back to Shops
       </button>
 
       {/* Shop Info Banner */}
@@ -94,7 +156,7 @@ export default function ShopDetails() {
         className="glass-card"
         style={{
           padding: '1.75rem',
-          marginBottom: '2.5rem',
+          marginBottom: '2rem',
           width: '100%',
           boxSizing: 'border-box',
           overflow: 'hidden',
@@ -157,6 +219,22 @@ export default function ShopDetails() {
               >
                 {!hasTiming ? 'Hours not set' : currentlyOpen ? 'OPEN' : 'CLOSED'}
               </span>
+              {shop.foodType && (
+                <span
+                  style={{
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#d97706',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {shop.foodType}
+                </span>
+              )}
             </div>
 
             <p style={{
@@ -194,24 +272,80 @@ export default function ShopDetails() {
         </div>
       </div>
 
+      {/* Shop-Scoped Categories Horizontal Selector */}
+      {categories.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Tag size={18} style={{ color: 'var(--primary)' }} /> Shop Categories
+            </h3>
+            {(selectedCategory || submittedSearch) && (
+              <button
+                onClick={() => {
+                  setSelectedCategory('');
+                  setSubmittedSearch('');
+                  setSearchInput('');
+                  setPage(1);
+                  updateUrlParams('', '');
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700' }}
+              >
+                Clear Shop Filters
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+            <CategoryCard
+              category={{ name: 'All Products' }}
+              isSelected={selectedCategory === ''}
+              onClick={() => handleCategorySelect('')}
+            />
+            {categories.map((cat) => (
+              <CategoryCard
+                key={cat._id}
+                category={cat}
+                isSelected={selectedCategory === cat._id || selectedCategory.toLowerCase() === cat.name.toLowerCase()}
+                onClick={() => handleCategorySelect(cat._id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Shop Products Section */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-            Products at {shop.name}
-          </h3>
+          <div>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
+              {selectedCategory ? `${categoryTitle} at ${shop.name}` : submittedSearch ? `Search Results in ${shop.name}` : `Products at ${shop.name}`}
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
+              {selectedCategory ? `Showing ${categoryTitle} items available in ${shop.name}` : `Browse all available items in ${shop.name}`}
+            </p>
+          </div>
           <div style={{ maxWidth: '300px', width: '100%' }}>
             <SearchBar
               value={searchInput}
               onChange={handleSearchInputChange}
               onSubmit={handleSearchSubmit}
-              placeholder="Search in this shop..."
+              placeholder={`Search in ${shop.name}...`}
             />
           </div>
         </div>
 
-        {products.length === 0 ? (
-          <EmptyState message="No available products found in this store." />
+        {productsLoading ? (
+          <LoadingSpinner message={`Loading products for ${shop.name}...`} />
+        ) : products.length === 0 ? (
+          <EmptyState
+            message={
+              selectedCategory
+                ? `No items available under "${categoryTitle}" in ${shop.name}.`
+                : submittedSearch
+                ? `No products matching "${submittedSearch}" found in ${shop.name}.`
+                : `No products currently available in ${shop.name}.`
+            }
+          />
         ) : (
           <>
             <div className="product-grid-responsive">

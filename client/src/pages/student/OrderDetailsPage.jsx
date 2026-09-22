@@ -524,7 +524,14 @@ export default function OrderDetailsPage() {
               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: idx < order.items.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
                 <div>
                   <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{item.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>₹{item.price} x {item.quantity}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    ₹{item.price} x {item.quantity}
+                    {Number(item.packingCharges) > 0 && (
+                      <span style={{ marginLeft: '0.5rem', color: '#0369a1', fontWeight: '600' }}>
+                        (Packing: ₹{item.packingCharges}/item)
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{item.subtotal.toFixed(2)}</div>
               </div>
@@ -537,6 +544,18 @@ export default function OrderDetailsPage() {
               <span>Subtotal</span>
               <span>₹{order.subtotal.toFixed(2)}</span>
             </div>
+            {order.packingCharges !== undefined && order.packingCharges !== null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span>Packing Charges</span>
+                <span>₹{order.packingCharges.toFixed(2)}</span>
+              </div>
+            )}
+            {order.deliveryDistance !== undefined && order.deliveryDistance !== null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span>Delivery Distance</span>
+                <span>{order.deliveryDistance} km</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
               <span>Delivery Fee</span>
               <span>₹{order.deliveryFee.toFixed(2)}</span>

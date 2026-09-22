@@ -12,11 +12,11 @@ export const getCart = async (req, res) => {
     let cart = await Cart.findOne({ user: req.user._id })
       .populate({
         path: 'items.product',
-        select: 'name price discountPrice images isAvailable stock unit shop',
+        select: 'name price discountPrice images isAvailable stock unit shop gstPercentage packingCharges',
       })
       .populate({
         path: 'items.shop',
-        select: 'name isApproved isActive deliveryFee minimumOrder upiEnabled upiId upiQrImage'
+        select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage'
       });
 
     if (!cart) {
@@ -177,7 +177,7 @@ export const addToCart = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive deliveryFee minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
     ]);
 
     return res.status(200).json({
@@ -265,7 +265,7 @@ export const updateCartItem = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive deliveryFee minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
     ]);
 
     return res.status(200).json({
@@ -308,7 +308,7 @@ export const removeCartItem = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive deliveryFee minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
     ]);
 
     return res.status(200).json({

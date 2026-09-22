@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -23,20 +23,49 @@ const Shopkeeper = lazy(() => import('./pages/Shopkeeper'));
 const Delivery = lazy(() => import('./pages/Delivery'));
 const Admin = lazy(() => import('./pages/Admin'));
 const About = lazy(() => import('./pages/About'));
+import NearCartLoader from './components/NearCartLoader';
 
 const PageFallback = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh', padding: '2rem' }}>
-    <div style={{ width: '2rem', height: '2rem', border: '3px solid var(--border-color)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-  </div>
+  <NearCartLoader fullScreen={true} message="Loading NearCart..." />
 );
+
+/**
+ * GlobalRouteLoader: Listens to location changes across ALL routes inside BrowserRouter
+ * and triggers a brief, perceptible NearCartLoader transition overlay.
+ */
+function GlobalRouteLoader({ children }) {
+  const location = useLocation();
+  const [isRouteChanging, setIsRouteChanging] = useState(false);
+
+  useEffect(() => {
+    // Whenever location (pathname or search query) changes, show loader transition overlay
+    setIsRouteChanging(true);
+
+    // Give browser paint cycle + brief animation window so loader is visually perceptible
+    const timer = setTimeout(() => {
+      setIsRouteChanging(false);
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [location.pathname, location.search]);
+
+  return (
+    <>
+      {isRouteChanging && (
+        <NearCartLoader fullScreen={true} message="Loading NearCart..." />
+      )}
+      {children}
+    </>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/" element={<MainLayout />}>
+      <GlobalRouteLoader>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<MainLayout />}>
             <Route index element={<Home />} />
             <Route
               path="login"
@@ -162,8 +191,9 @@ function App() {
           </Route>
         </Routes>
       </Suspense>
-    </BrowserRouter>
-  );
+    </GlobalRouteLoader>
+  </BrowserRouter>
+);
 }
 
 export default App;

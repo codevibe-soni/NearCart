@@ -177,6 +177,7 @@ export const sendOrderPlacedEmailToShopkeeper = async ({
   orderId,
   items = [],
   subtotal = 0,
+  packingCharges = 0,
   deliveryFee = 0,
   gstAmount = 0,
   discount = 0,
@@ -202,6 +203,7 @@ export const sendOrderPlacedEmailToShopkeeper = async ({
 
   // Format monetary values strictly as numbers with 2 decimal places
   const subtotalNum = Number(subtotal) || 0;
+  const packingChargesNum = Number(packingCharges) || 0;
   const deliveryFeeNum = Number(deliveryFee) || 0;
   const gstAmountNum = Number(gstAmount) || 0;
   const discountNum = Number(discount) || 0;
@@ -382,6 +384,11 @@ export const sendOrderPlacedEmailToShopkeeper = async ({
               <td style="padding: 6px 0; color: #64748b;">Subtotal:</td>
               <td style="padding: 6px 0; font-weight: 600; text-align: right;">₹${subtotalNum.toFixed(2)}</td>
             </tr>
+            ${packingChargesNum > 0 ? `
+            <tr>
+              <td style="padding: 6px 0; color: #64748b;">Packing Charges:</td>
+              <td style="padding: 6px 0; font-weight: 600; text-align: right;">₹${packingChargesNum.toFixed(2)}</td>
+            </tr>` : ''}
             <tr>
               <td style="padding: 6px 0; color: #64748b;">Delivery Fee:</td>
               <td style="padding: 6px 0; font-weight: 600; text-align: right;">₹${deliveryFeeNum.toFixed(2)}</td>

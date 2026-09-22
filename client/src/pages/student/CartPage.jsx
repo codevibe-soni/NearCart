@@ -77,9 +77,13 @@ export default function CartPage() {
   // Calculate Subtotal & Totals
   const items = cart?.items || [];
   const subtotal = items.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+  const packingCharges = items.reduce(
+    (acc, item) => acc + (Number(item.product?.packingCharges) || 0) * item.quantity,
+    0
+  );
   const shop = items.length > 0 ? items[0].shop : null;
   const deliveryFee = shop?.deliveryFee !== undefined ? shop.deliveryFee : 0;
-  const total = subtotal + (items.length > 0 ? deliveryFee : 0);
+  const total = subtotal + packingCharges + (items.length > 0 ? deliveryFee : 0);
 
   if (loading) {
     return (
@@ -205,6 +209,11 @@ export default function CartPage() {
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
                     Unit: {product.unit || 'Item'}
                   </div>
+                  {Number(product.packingCharges) > 0 && (
+                    <div style={{ color: '#0369a1', fontSize: '0.8rem', marginTop: '0.2rem', fontWeight: '600' }}>
+                      Packing: ₹{product.packingCharges} × {item.quantity} = ₹{(product.packingCharges * item.quantity).toFixed(2)}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginTop: '0.4rem' }}>
                     <span style={{ color: 'var(--primary)', fontWeight: '700', fontSize: '1rem' }}>
                       ₹{item.price}
@@ -291,6 +300,13 @@ export default function CartPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
                 <span>Item Subtotal ({items.reduce((sum, i) => sum + i.quantity, 0)} items)</span>
                 <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{subtotal.toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>Packing Charges</span>
+                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                  ₹{packingCharges.toFixed(2)}
+                </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>

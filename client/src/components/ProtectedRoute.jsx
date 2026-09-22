@@ -1,18 +1,16 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NearCartLoader from './NearCartLoader';
 
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--text-muted)' }}>
-        <p>Verifying authentication...</p>
-      </div>
-    );
+    return <NearCartLoader fullScreen={true} message="Verifying authentication..." />;
   }
+
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;

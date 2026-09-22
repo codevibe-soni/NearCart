@@ -1,21 +1,37 @@
 import mongoose from 'mongoose';
 import Shop from '../models/Shop.js';
+import Category from '../models/Category.js';
 
 // @route   GET /api/shops
-// @desc    Get all active and approved shops with search
+// @desc    Get all active and approved shops with search & category filter
 // @access  Public
 export const getShops = async (req, res, next) => {
   try {
-    const { search } = req.query;
+    const { search, category } = req.query;
 
     const query = {
       isApproved: true,
       isActive: true,
     };
 
+    if (category) {
+      if (mongoose.Types.ObjectId.isValid(category)) {
+        query.category = category;
+      } else {
+        const catDoc = await Category.findOne({
+          name: new RegExp(`^${category.trim()}`, 'i'),
+        });
+        if (catDoc) {
+          query.category = catDoc._id;
+        } else {
+          query.category = new mongoose.Types.ObjectId();
+        }
+      }
+    }
+
     if (search) {
       const searchRegex = new RegExp(search.trim(), 'i');
-      query.$or = [{ name: searchRegex }, { description: searchRegex }];
+      query.$or = [{ name: searchRegex }, { description: searchRegex }, { foodType: searchRegex }];
     }
 
     const shops = await Shop.find(query)

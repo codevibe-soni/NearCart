@@ -1,17 +1,15 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NearCartLoader from './NearCartLoader';
 
 export default function PublicOnlyRoute({ children }) {
   const { user, loading, isAuthenticated } = useAuth();
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--text-muted)' }}>
-        <p>Verifying authentication...</p>
-      </div>
-    );
+    return <NearCartLoader fullScreen={true} message="Verifying authentication..." />;
   }
+
 
   if (isAuthenticated && user) {
     const getRolePath = (role) => {

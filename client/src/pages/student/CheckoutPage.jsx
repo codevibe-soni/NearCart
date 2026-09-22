@@ -26,7 +26,13 @@ export default function CheckoutPage() {
   const [locationMessage, setLocationMessage] = useState('');
   const [detectedLocalityInfo, setDetectedLocalityInfo] = useState(null);
 
+  // Manual Delivery Distance State
+  const [distanceInput, setDistanceInput] = useState('');
+  const [calculatedDistanceInfo, setCalculatedDistanceInfo] = useState(null);
+  const [distanceError, setDistanceError] = useState('');
+
   // Address Form Modal State
+
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [addressFormData, setAddressFormData] = useState({
     label: 'HOSTEL',
@@ -180,9 +186,58 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleCalculateDelivery = (overrideVal) => {
+    setDistanceError('');
+    const val = overrideVal !== undefined ? overrideVal : distanceInput;
+    if (val === '' || val === null || val === undefined) {
+      setDistanceError('Please enter distance from shop.');
+      setCalculatedDistanceInfo(null);
+      return;
+    }
+
+    const distNum = Number(val);
+    if (isNaN(distNum) || !isFinite(distNum) || distNum < 0 || distNum > 100) {
+      setDistanceError('Please enter a valid delivery distance (0–100 km).');
+      setCalculatedDistanceInfo(null);
+      return;
+    }
+
+    const slabs = shop?.deliveryChargeSlabs || [];
+    let fee = shop?.deliveryFee !== undefined ? Number(shop.deliveryFee) : 0;
+
+    if (slabs.length > 0) {
+      const sorted = [...slabs].sort((x, y) => Number(x.minDistanceKm) - Number(y.minDistanceKm));
+      const exact = sorted.find((s) => distNum >= Number(s.minDistanceKm) && distNum <= Number(s.maxDistanceKm));
+      if (exact) {
+        fee = Number(exact.charge);
+      } else if (distNum <= Number(sorted[0].minDistanceKm)) {
+        fee = Number(sorted[0].charge);
+      } else {
+        const upper = sorted.find((s) => distNum <= Number(s.maxDistanceKm));
+        if (upper) {
+          fee = Number(upper.charge);
+        } else {
+          fee = Number(sorted[sorted.length - 1].charge);
+        }
+      }
+    }
+
+    setCalculatedDistanceInfo({
+      distanceKm: Math.round(distNum * 100) / 100,
+      deliveryFee: fee,
+    });
+  };
+
   const handlePlaceOrder = async () => {
+    if (submitting) return;
+
     if (!selectedAddressId) {
       setError('Please select or add a delivery address');
+      return;
+    }
+
+    if (!calculatedDistanceInfo) {
+      setError('Please enter delivery distance from shop and calculate delivery fee before placing order.');
       return;
     }
 
@@ -190,11 +245,15 @@ export default function CheckoutPage() {
       setSubmitting(true);
       setError('');
 
+      const orderKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'ord-' + Date.now() + '-' + Math.random().toString(36).substring(2);
+
       const payload = {
         addressId: selectedAddressId,
         paymentMethod,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         notes,
+        deliveryDistance: calculatedDistanceInfo.distanceKm,
+        idempotencyKey: orderKey,
         ...(buyNowItem
           ? {
               isBuyNow: true,
@@ -223,6 +282,7 @@ export default function CheckoutPage() {
       setSubmitting(false);
     }
   };
+
 
   let items = [];
   let shop = null;
@@ -257,26 +317,32 @@ export default function CheckoutPage() {
   0
 );
 
-const deliveryFee = Number(shop?.deliveryFee) || 0;
+  const packingCharges = items.reduce(
+    (sum, item) => sum + (Number(item.product?.packingCharges) || 0) * item.quantity,
+    0
+  );
 
-const discountAmount = appliedCoupon
-  ? Number(appliedCoupon.discountAmount) || 0
-  : 0;
+  const discountAmount = appliedCoupon
+    ? Number(appliedCoupon.discountAmount) || 0
+    : 0;
 
-// Calculate GST from effective selling price
-const gstAmount = items.reduce((sum, item) => {
-  const itemSubtotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
-  const gstPercentage = Number(item.product?.gstPercentage) || 0;
+  // Calculate GST from effective selling price
+  const gstAmount = items.reduce((sum, item) => {
+    const itemSubtotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
+    const gstPercentage = Number(item.product?.gstPercentage) || 0;
 
-  return sum + (itemSubtotal * gstPercentage) / 100;
-}, 0);
+    return sum + (itemSubtotal * gstPercentage) / 100;
+  }, 0);
 
-const roundedGstAmount = Math.round(gstAmount * 100) / 100;
+  const roundedGstAmount = Math.round(gstAmount * 100) / 100;
 
-const finalTotal = Math.max(
-  0,
-  subtotal + roundedGstAmount + deliveryFee - discountAmount
-);
+  const deliveryFee = calculatedDistanceInfo ? Number(calculatedDistanceInfo.deliveryFee) : 0;
+
+  const finalTotal = Math.max(
+    0,
+    subtotal + packingCharges + roundedGstAmount + (calculatedDistanceInfo ? deliveryFee : 0) - discountAmount
+  );
+
 
   if (loading) {
     return (
@@ -463,7 +529,88 @@ const finalTotal = Math.max(
             )}
           </div>
 
-          {/* 2. Payment Method Section */}
+          {/* 2. Delivery Distance Section */}
+          <div style={{
+            background: 'var(--surface)',
+            borderRadius: '0.75rem',
+            border: '1px solid var(--border-color)',
+            padding: '1.5rem',
+          }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Compass size={20} style={{ color: 'var(--primary)' }} /> 2. Delivery Distance
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              Enter distance from selected shop ({shop?.name || 'Shop'}) to calculate delivery fee.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+              <div style={{ position: 'relative', flex: '1', minWidth: '160px' }}>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  placeholder="e.g. 4.7"
+                  value={distanceInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDistanceInput(val);
+                    if (val === '') {
+                      setCalculatedDistanceInfo(null);
+                      setDistanceError('');
+                    } else if (!isNaN(Number(val)) && Number(val) >= 0) {
+                      handleCalculateDelivery(val);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 2.5rem 0.65rem 0.85rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                  }}
+                />
+                <span style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '700' }}>
+                  km
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleCalculateDelivery()}
+                className="btn-primary"
+                style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem', whiteSpace: 'nowrap' }}
+              >
+                Calculate Delivery
+              </button>
+            </div>
+
+            {distanceError && (
+              <div style={{ color: 'var(--danger)', fontSize: '0.825rem', marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <AlertCircle size={14} />
+                <span>{distanceError}</span>
+              </div>
+            )}
+
+            {calculatedDistanceInfo ? (
+              <div style={{ marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', color: '#166534', fontSize: '0.9rem' }}>
+                <div style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <CheckCircle size={16} style={{ color: '#16a34a' }} /> Delivery distance calculated
+                </div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.875rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                  <span>✓ Delivery distance: <strong>{calculatedDistanceInfo.distanceKm} km</strong></span>
+                  <span>✓ Delivery fee: <strong>₹{calculatedDistanceInfo.deliveryFee}</strong></span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                Delivery Fee will be calculated based on distance slabs configured by {shop?.name || 'this shop'}.
+              </div>
+            )}
+          </div>
+
+          {/* 3. Payment Method Section */}
           <div style={{
             background: 'var(--surface)',
             borderRadius: '0.75rem',
@@ -471,8 +618,9 @@ const finalTotal = Math.max(
             padding: '1.5rem',
           }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CreditCard size={20} style={{ color: 'var(--primary)' }} /> 2. Select Payment Method
+              <CreditCard size={20} style={{ color: 'var(--primary)' }} /> 3. Select Payment Method
             </h3>
+
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {/* COD Option */}
@@ -808,13 +956,28 @@ const finalTotal = Math.max(
                 <span className="cpn-price-value">₹{subtotal.toFixed(2)}</span>
               </div>
               <div className="cpn-price-row">
+                <span className="cpn-price-label">Packing Charges</span>
+                <span className="cpn-price-value">₹{packingCharges.toFixed(2)}</span>
+              </div>
+              <div className="cpn-price-row">
+                <span className="cpn-price-label">Delivery Distance</span>
+                <span className="cpn-price-value">
+                  {calculatedDistanceInfo ? `${calculatedDistanceInfo.distanceKm} km` : 'Not entered'}
+                </span>
+              </div>
+              <div className="cpn-price-row">
                 <span className="cpn-price-label">Delivery Fee</span>
-                <span className="cpn-price-value">{deliveryFee > 0 ? `₹${deliveryFee.toFixed(2)}` : 'FREE'}</span>
+                <span className="cpn-price-value" style={{ color: calculatedDistanceInfo ? 'inherit' : 'var(--text-muted)', fontStyle: calculatedDistanceInfo ? 'normal' : 'italic' }}>
+                  {calculatedDistanceInfo
+                    ? (deliveryFee > 0 ? `₹${deliveryFee.toFixed(2)}` : 'FREE')
+                    : 'Enter distance to calculate'}
+                </span>
               </div>
               <div className="cpn-price-row">
                 <span className="cpn-price-label">GST</span>
                 <span className="cpn-price-value">₹{roundedGstAmount.toFixed(2)}</span>
               </div>
+
               {appliedCoupon && (
                 <div className="cpn-price-row cpn-price-row--discount" aria-label={`Coupon discount: minus ₹${discountAmount.toFixed(2)}`}>
                   <span className="cpn-price-label">

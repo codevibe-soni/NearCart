@@ -70,12 +70,12 @@ export default function Home() {
     },
     {
       title: 'Lightning-Fast Page Load',
-      desc: 'Route-level code splitting, lazy-loaded Leaflet map tracking, and optimized lean MongoDB query projections.',
+      desc: 'Route-level code splitting, lazy-loaded map tracking, and optimized lean database query projections.',
       badge: 'Performance',
     },
     {
       title: 'Instant Real-Time Notifications',
-      desc: 'Consolidated Socket.IO realtime delivery tracker with background FCM push notifications.',
+      desc: 'Consolidated real-time delivery tracker with background push notifications.',
       badge: 'Real-Time',
     },
   ];
@@ -396,7 +396,7 @@ export default function Home() {
               </p>
 
               <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center', marginBottom: '2rem' }}>
-                {['React 18', 'Vite', 'Node.js', 'Express', 'MongoDB', 'Socket.IO', 'Firebase FCM', 'PWA', 'Leaflet Live GPS'].map((tech) => (
+                {['Hyperlocal Delivery', 'Fast Checkout', 'Live Order Tracking', 'Mobile First', 'Push Alerts', 'Secure Payments'].map((tech) => (
                   <span
                     key={tech}
                     style={{

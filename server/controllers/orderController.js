@@ -13,6 +13,8 @@ import Delivery from '../models/Delivery.js';
 import { getIO } from '../config/socket.js';
 import { sendPushToUser, sendPushToTokens } from '../services/pushNotificationService.js';
 import { sendOrderPlacedEmailToShopkeeper } from '../services/emailService.js';
+import { calculateDeliveryFeeForShopAndAddress, calculateDeliveryFeeFromDistance } from '../utils/distanceCalculator.js';
+
 
 /**
  * Helper to generate human-readable unique order number: CC-2026-XXXXXX
@@ -133,7 +135,25 @@ export const applyCoupon = async (req, res) => {
  */
 export const createOrder = async (req, res) => {
   try {
-    const { addressId, paymentMethod = 'COD', couponCode, notes, isBuyNow, buyNowItem } = req.body;
+    const { addressId, paymentMethod = 'COD', couponCode, notes, isBuyNow, buyNowItem, idempotencyKey, deliveryDistance: reqDeliveryDistance } = req.body;
+    const key = idempotencyKey || req.headers['x-idempotency-key'] || null;
+
+
+    if (key) {
+      const existingOrder = await Order.findOne({ user: req.user._id, idempotencyKey: key })
+        .populate([
+          { path: 'shop', select: 'name phone address bannerImage owner' },
+          { path: 'address' },
+          { path: 'items.product', select: 'name images unit' },
+        ]);
+      if (existingOrder) {
+        return res.status(200).json({
+          success: true,
+          message: 'Order created successfully',
+          data: existingOrder,
+        });
+      }
+    }
 
     if (!addressId) {
       return res.status(400).json({
@@ -230,7 +250,8 @@ export const createOrder = async (req, res) => {
         quantity,
         price: effectivePrice,
         subtotal: itemSubtotal,
-         gstPercentage: Number(product.gstPercentage) || 0,
+        gstPercentage: Number(product.gstPercentage) || 0,
+        packingCharges: Number(product.packingCharges) || 0,
       });
 
       stockUpdates.push({
@@ -303,6 +324,7 @@ export const createOrder = async (req, res) => {
           price: effectivePrice,
           subtotal: itemSubtotal,
           gstPercentage: Number(product.gstPercentage) || 0,
+          packingCharges: Number(product.packingCharges) || 0,
         });
 
         stockUpdates.push({
@@ -321,8 +343,18 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 5. Calculate delivery fee
-    const deliveryFee = shop.deliveryFee !== undefined ? shop.deliveryFee : 0;
+    // 5. Calculate delivery fee server-side using customer-entered distance (or fallback)
+    const deliveryCalc = calculateDeliveryFeeForShopAndAddress(shop, address, reqDeliveryDistance);
+    if (!deliveryCalc.success) {
+      return res.status(400).json({
+        success: false,
+        message: deliveryCalc.error,
+      });
+    }
+
+    const deliveryFee = deliveryCalc.deliveryFee;
+    const deliveryDistance = deliveryCalc.distanceKm;
+
 
     // 6. Validate & calculate coupon discount server-side if provided
     let discountAmount = 0;
@@ -356,25 +388,25 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    // 7. Calculate total amount
-    // const totalAmount = Math.max(0, calculatedSubtotal + deliveryFee - discountAmount);
-// 7. Calculate GST and final total amount
+// 7. Calculate Product-Level Packing Charges, GST, and final total amount
+let packingCharges = 0;
 let gstAmount = 0;
 
 for (const item of orderItems) {
+  const itemPacking = (Number(item.packingCharges) || 0) * (Number(item.quantity) || 0);
+  packingCharges += itemPacking;
+
   const gstPercentage = Number(item.gstPercentage) || 0;
-
-  const itemGst =
-    (Number(item.subtotal) * gstPercentage) / 100;
-
+  const itemGst = (Number(item.subtotal) * gstPercentage) / 100;
   gstAmount += itemGst;
 }
 
+packingCharges = Math.round(packingCharges * 100) / 100;
 gstAmount = Math.round(gstAmount * 100) / 100;
 
 const totalAmount = Math.max(
   0,
-  calculatedSubtotal + gstAmount + deliveryFee - discountAmount
+  calculatedSubtotal + packingCharges + gstAmount + deliveryFee - discountAmount
 );
     // 8. Generate unique order number with retry on collision
     let orderNumber = generateOrderNumber();
@@ -401,24 +433,47 @@ const totalAmount = Math.max(
   imageUrl: shop.upiQrImage || '',
     };
 
-    // 9. Create Order Document
-    const order = await Order.create({
-      orderNumber,
-      user: req.user._id,
-      shop: shop._id,
-      items: orderItems,
-      address: address._id,
-      subtotal: calculatedSubtotal,
-      deliveryFee,
-      discount: discountAmount,
-      gstAmount,
-      totalAmount,
-      paymentMethod,
-      paymentStatus: 'PENDING',
-      upiQrSnapshot,
-      orderStatus: 'PLACED',
-      notes: notes ? notes.trim() : '',
-    });
+    // 9. Create Order Document (with idempotency handling)
+    let order;
+    try {
+      order = await Order.create({
+        orderNumber,
+        user: req.user._id,
+        shop: shop._id,
+        items: orderItems,
+        address: address._id,
+        subtotal: calculatedSubtotal,
+        packingCharges,
+        deliveryFee,
+        deliveryDistance,
+        discount: discountAmount,
+        gstAmount,
+        totalAmount,
+        paymentMethod,
+        paymentStatus: 'PENDING',
+        upiQrSnapshot,
+        orderStatus: 'PLACED',
+        notes: notes ? notes.trim() : '',
+        ...(key ? { idempotencyKey: key } : {}),
+      });
+    } catch (createErr) {
+      if (createErr.code === 11000 && key) {
+        const existingOrder = await Order.findOne({ user: req.user._id, idempotencyKey: key })
+          .populate([
+            { path: 'shop', select: 'name phone address bannerImage owner' },
+            { path: 'address' },
+            { path: 'items.product', select: 'name images unit' },
+          ]);
+        if (existingOrder) {
+          return res.status(200).json({
+            success: true,
+            message: 'Order created successfully',
+            data: existingOrder,
+          });
+        }
+      }
+      throw createErr;
+    }
 
     // 9b. Create initial unassigned Delivery Record (status: PENDING, deliveryBoy: null)
     try {
@@ -763,6 +818,7 @@ try {
         orderId: order._id,
         items: orderItems,
         subtotal: order.subtotal,
+        packingCharges: order.packingCharges,
         deliveryFee: order.deliveryFee,
         gstAmount: order.gstAmount,
         discount: order.discount,
