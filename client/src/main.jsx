@@ -8,6 +8,13 @@ import './index.css';
 import './theme.css';
 import './coupon.css';
 
+// Global capture for beforeinstallprompt (must run before React mounts)
+window.__nearCartDeferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  window.__nearCartDeferredInstallPrompt = event;
+});
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>

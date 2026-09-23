@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Download } from 'lucide-react';
 import { registerPwaInstallation } from '../utils/pwaInstallTracker';
 
@@ -8,7 +8,7 @@ import { registerPwaInstallation } from '../utils/pwaInstallTracker';
  * Renders a user-friendly "Install App" button in NearCart UI when installable.
  */
 export default function PwaInstallButton({ style, className, variant = 'navbar' }) {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const deferredPromptRef = useRef(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -20,11 +20,19 @@ export default function PwaInstallButton({ style, className, variant = 'navbar' 
 
     setIsStandalone(inStandalone);
 
+    // If already installed, nothing to do
     if (inStandalone) return;
+
+    // Recover any globally captured beforeinstallprompt event (may have fired before component mounted)
+    if (window.__nearCartDeferredInstallPrompt) {
+      deferredPromptRef.current = window.__nearCartDeferredInstallPrompt;
+      setIsInstallable(true);
+      console.log('💡 [PWA] beforeinstallprompt event recovered from global');
+    }
 
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      deferredPromptRef.current = e;
       setIsInstallable(true);
       console.log('💡 [PWA] beforeinstallprompt event captured');
     };
@@ -32,7 +40,7 @@ export default function PwaInstallButton({ style, className, variant = 'navbar' 
     const handleAppInstalled = () => {
       console.log('🎉 [PWA] App installed successfully');
       setIsInstallable(false);
-      setDeferredPrompt(null);
+      deferredPromptRef.current = null;
       setIsStandalone(true);
       registerPwaInstallation();
     };
@@ -47,14 +55,14 @@ export default function PwaInstallButton({ style, className, variant = 'navbar' 
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPromptRef.current) return;
     try {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      console.log(`[PWA] User response to install prompt: ${choiceResult.outcome}`);
-      if (choiceResult.outcome === 'accepted') {
+      await deferredPromptRef.current.prompt();
+      const { outcome } = await deferredPromptRef.current.userChoice;
+      console.log(`[PWA] User response to install prompt: ${outcome}`);
+      if (outcome === 'accepted') {
         setIsInstallable(false);
-        setDeferredPrompt(null);
+        deferredPromptRef.current = null;
         registerPwaInstallation();
       }
     } catch (err) {
@@ -62,7 +70,7 @@ export default function PwaInstallButton({ style, className, variant = 'navbar' 
     }
   };
 
-  if (!isInstallable || isStandalone || !deferredPrompt) {
+  if (!isInstallable || isStandalone || !deferredPromptRef.current) {
     return null;
   }
 
