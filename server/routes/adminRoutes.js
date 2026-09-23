@@ -3,6 +3,7 @@ import {
   getStaffMembers,
   getAllUsers,
   updateUserStatus,
+  deleteUserAdmin,
   getAllShops,
   updateShopStatus,
   deleteShopAdmin,
@@ -20,6 +21,7 @@ router.use(protect, authorizeRoles('ADMIN'));
 router.get('/staff', getStaffMembers);
 router.get('/users', getAllUsers);
 router.patch('/users/:id/status', updateUserStatus);
+router.delete('/users/:id', deleteUserAdmin);
 
 // Shop Management & Moderation routes
 router.get('/shops', getAllShops);

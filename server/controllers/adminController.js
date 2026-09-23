@@ -242,6 +242,42 @@ export const updateUserStatus = async (req, res, next) => {
   }
 };
 
+// @route   DELETE /api/admin/users/:id
+// @desc    Permanently delete a user (admin only)
+// @access  Private/Admin
+export const deleteUserAdmin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+    }
+
+    // Prevent admin from deleting themselves
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Administrators cannot delete their own account.' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent deleting other ADMIN accounts
+    if (user.role === 'ADMIN') {
+      return res.status(403).json({ success: false, message: 'Cannot delete an Administrator account.' });
+    }
+
+    await User.findByIdAndDelete(id);
+    console.log(`[ADMIN AUDIT] Admin ${req.user._id} deleted user ${user.email} (${id}).`);
+    return res.status(200).json({
+      success: true,
+      message: `User ${user.name} (${user.role}) has been permanently deleted.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 /**
  * @desc    Preview estimated document counts for cleanup targets
  * @route   POST /api/admin/clean-data/preview

@@ -157,6 +157,24 @@ export default function Admin() {
     }
   };
 
+  // Delete user (admin only)
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete ${userName}? This action cannot be undone.`)) return;
+    setError('');
+    setSuccess('');
+    try {
+      const res = await api.delete(`/admin/users/${userId}`);
+      if (res.success) {
+        setSuccess(res.message || 'User deleted successfully');
+        fetchUsers();
+      } else {
+        setError(res.message || 'Failed to delete user');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to delete user');
+    }
+  };
+
   const filteredUsers = usersList.filter((u) => {
     if (userRoleFilter === 'ALL') return true;
     return u.role === userRoleFilter;
@@ -460,29 +478,47 @@ export default function Admin() {
                         </span>
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap', minWidth: '150px' }}>
-                        {u.role !== 'ADMIN' && (
-                          <button
-                            onClick={() => handleToggleBlockUser(u._id, u.isActive, u.name)}
-                            className="btn-secondary"
-                            style={{
-                              padding: '0.35rem 0.85rem',
-                              fontSize: '0.8rem',
-                              color: u.isActive ? 'var(--danger)' : 'var(--success)',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {u.isActive ? (
-                              <>
-                                <Lock size={14} /> Block
-                              </>
-                            ) : (
-                              <>
-                                <Unlock size={14} /> Unblock
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </td>
+  {u.role !== 'ADMIN' && (
+    <>
+      <button
+        onClick={() => handleToggleBlockUser(u._id, u.isActive, u.name)}
+        className="btn-secondary"
+        style={{
+          padding: '0.35rem 0.85rem',
+          fontSize: '0.8rem',
+          color: u.isActive ? 'var(--danger)' : 'var(--success)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {u.isActive ? (
+          <>
+            <Lock size={14} /> Block
+          </>
+        ) : (
+          <>
+            <Unlock size={14} /> Unblock
+          </>
+        )}
+      </button>
+      <button
+        onClick={() => handleDeleteUser(u._id, u.name)}
+        className="btn-danger"
+        style={{
+          marginLeft: '0.5rem',
+          padding: '0.35rem 0.85rem',
+          fontSize: '0.8rem',
+          color: '#fff',
+          backgroundColor: 'var(--danger)',
+          borderColor: 'var(--danger)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <Trash2 size={14} /> Delete
+      </button>
+    </>
+  )}
+</td>
+
                     </tr>
                   ))}
                 </tbody>
