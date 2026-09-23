@@ -21,6 +21,7 @@ import {
   Users,
   Building2,
   Compass,
+  Sparkles,
 } from 'lucide-react';
 
 export default function About() {
