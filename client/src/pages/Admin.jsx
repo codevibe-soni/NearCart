@@ -635,6 +635,23 @@ export default function Admin() {
                       <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                         {p.providerPaymentId || p.transactionId || '—'}
                       </td>
+<td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
+  <button
+    onClick={() => handleDeletePayment(p._id)}
+    disabled={deletingPaymentId === p._id}
+    className="btn-danger"
+    style={{
+      backgroundColor: 'var(--danger)',
+      color: '#fff',
+      border: 'none',
+      padding: '0.35rem 0.6rem',
+      fontSize: '0.75rem',
+      cursor: 'pointer',
+    }}
+  >
+    <Trash2 size={14} /> Delete
+  </button>
+</td>
                     </tr>
                   ))}
                 </tbody>
