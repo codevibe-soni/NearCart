@@ -44,7 +44,7 @@ export default function NearCartLogo({ size = 'medium', showText = true, textCol
           }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span>Near</span>
+            <span>NearCart+</span>
             <span
               style={{
                 background: cartGradient,
@@ -52,10 +52,16 @@ export default function NearCartLogo({ size = 'medium', showText = true, textCol
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Cart
+              FoodDisk
             </span>
           </span>
-          <span style={{ fontSize: '0.73rem', fontWeight: '500', color: '#0284c7' }}>FoodDisk · Grocery · More</span>
+          <span style={{
+            fontSize: '0.73rem',
+            fontWeight: '600',
+            fontStyle: 'italic',
+            color: '#64748b',
+            marginTop: '0.1rem'
+          }}>Food · Grocery · More</span>
         </span>
       )}
     </div>

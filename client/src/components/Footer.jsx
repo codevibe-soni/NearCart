@@ -65,7 +65,9 @@ export default function Footer() {
   );
 
   return (
+    <>
     <footer
+      className="main-footer"
       style={{
         background: 'linear-gradient(180deg, #041d14 0%, #02120d 100%)',
         color: '#f8fafc',
@@ -346,24 +348,17 @@ export default function Footer() {
           outline: none;
         }
         @media (max-width: 768px) {
-          .footer-container {
-            padding: 1rem 0.85rem 0.75rem 0.85rem !important;
+          .main-footer {
+            display: none !important;
           }
-          .footer-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 0.85rem 1rem !important;
-          }
-        }
-        @media (max-width: 480px) {
-          .footer-container {
-            padding: 0.85rem 0.65rem 0.65rem 0.65rem !important;
-          }
-          .footer-grid {
-            grid-template-columns: 1fr !important;
-            gap: 0.75rem !important;
+          .mobile-footer-spacer {
+            display: block !important;
+            height: 5rem;
           }
         }
       `}</style>
     </footer>
+    <div className="mobile-footer-spacer" style={{ display: 'none' }}></div>
+    </>
   );
 }
