@@ -22,6 +22,7 @@ import {
   UserPlus,
   LayoutDashboard
 } from 'lucide-react';
+import MobileBottomNav from '../components/MobileBottomNav';
 import NearCartLogo from '../components/NearCartLogo';
 import PwaInstallButton from '../components/PwaInstallButton';
 import PwaInstallBanner from '../components/PwaInstallBanner';
@@ -672,6 +673,9 @@ export default function MainLayout() {
       <main style={{ flex: 1 }}>
         <Outlet />
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
 
       <PwaInstallBanner />
 
