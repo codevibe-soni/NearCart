@@ -18,7 +18,6 @@ import {
   Layers,
   Code,
 } from 'lucide-react';
-import NearCartLogo from '../components/NearCartLogo';
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
@@ -154,7 +153,7 @@ export default function Home() {
           </div>
 
           <div style={{ marginBottom: '1.25rem' }}>
-            <NearCartLogo size="large" />
+            
           </div>
 
           <h1

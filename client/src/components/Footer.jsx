@@ -69,20 +69,20 @@ export default function Footer() {
     <footer
       className="main-footer"
       style={{
-        background: 'linear-gradient(180deg, #041d14 0%, #02120d 100%)',
+        background: '#0f172a',
         color: '#f8fafc',
-        borderTop: '1px solid rgba(52, 211, 153, 0.15)',
+        borderTop: '1px solid rgba(2, 132, 199, 0.3)',
         position: 'relative',
         marginTop: 'auto',
         overflow: 'hidden',
       }}
     >
-      {/* Top Emerald Gradient Accent Line */}
+      {/* Top Gradient Accent Line */}
       <div
         style={{
           height: '3px',
           width: '100%',
-          background: 'linear-gradient(90deg, #10b981 0%, #0284c7 50%, #34d399 100%)',
+          background: 'linear-gradient(90deg, #38bdf8 0%, #0284c7 50%, #1e3a8a 100%)',
         }}
       />
 
@@ -110,7 +110,7 @@ export default function Footer() {
               <NearCartLogo size="small" variant="dark" />
             </div>
 
-            <p style={{ fontSize: '0.78rem', fontWeight: '700', color: '#34d399', margin: '0 0 0.25rem 0' }}>
+            <p style={{ fontSize: '0.78rem', fontWeight: '700', color: '#38bdf8', margin: '0 0 0.25rem 0' }}>
               "Your nearby shops, delivered."
             </p>
 
@@ -140,8 +140,8 @@ export default function Footer() {
                           width: '1.75rem',
                           height: '1.75rem',
                           borderRadius: '50%',
-                          background: 'rgba(255, 255, 255, 0.06)',
-                          border: '1px solid rgba(52, 211, 153, 0.2)',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(56, 189, 248, 0.2)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -174,7 +174,7 @@ export default function Footer() {
                 gap: '0.35rem',
               }}
             >
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
               Quick Links
             </h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.78rem' }}>
@@ -257,8 +257,8 @@ export default function Footer() {
           <div>
             <div
               style={{
-                background: 'rgba(16, 185, 129, 0.05)',
-                border: '1px solid rgba(52, 211, 153, 0.2)',
+                background: 'rgba(56, 189, 248, 0.05)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
                 borderRadius: '0.5rem',
                 padding: '0.65rem 0.85rem',
               }}
@@ -267,14 +267,14 @@ export default function Footer() {
                 style={{
                   fontSize: '0.8rem',
                   fontWeight: '800',
-                  color: '#34d399',
+                  color: '#38bdf8',
                   margin: '0 0 0.3rem 0',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.35rem',
                 }}
               >
-                <ShieldCheck size={14} style={{ color: '#34d399' }} />
+                <ShieldCheck size={14} style={{ color: '#38bdf8' }} />
                 Privacy & Safety
               </h4>
 
@@ -294,7 +294,7 @@ export default function Footer() {
                   borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                 }}
               >
-                <Lock size={11} style={{ color: '#34d399', flexShrink: 0 }} />
+                <Lock size={11} style={{ color: '#38bdf8', flexShrink: 0 }} />
                 <span>Secure account protection enabled.</span>
               </div>
             </div>
@@ -320,7 +320,7 @@ export default function Footer() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#94a3b8' }}>
-            <ShieldCheck size={12} style={{ color: '#34d399' }} />
+            <ShieldCheck size={12} style={{ color: '#38bdf8' }} />
             <span>Secure & Private Local Ordering</span>
           </div>
         </div>
@@ -335,16 +335,16 @@ export default function Footer() {
           display: inline-block;
         }
         .footer-link:hover, .footer-link:focus-visible {
-          color: #34d399 !important;
+          color: #38bdf8 !important;
           transform: translateX(3px);
           outline: none;
         }
         .social-icon-btn:hover, .social-icon-btn:focus-visible {
-          background: #10b981 !important;
+          background: #0284c7 !important;
           color: #ffffff !important;
-          border-color: #34d399 !important;
+          border-color: #38bdf8 !important;
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+          box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
           outline: none;
         }
         @media (max-width: 768px) {
@@ -353,7 +353,7 @@ export default function Footer() {
           }
           .mobile-footer-spacer {
             display: block !important;
-            height: 5rem;
+            height: 5.5rem;
           }
         }
       `}</style>

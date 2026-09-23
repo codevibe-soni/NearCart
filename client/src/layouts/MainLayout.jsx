@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import api from '../services/api';
@@ -38,7 +38,9 @@ export default function MainLayout() {
   const [cartCount, setCartCount] = useState(0);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
+  const isHome = location.pathname === '/';
   const recentNotifications = notifications.slice(0, 5);
 
   useEffect(() => {
@@ -126,9 +128,9 @@ export default function MainLayout() {
       {/* Header Navbar */}
       <header
         style={{
-          borderBottom: '1px solid var(--border-color)',
-          background: '#ffffff',
-          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+          borderBottom: '1px solid #bae6fd',
+          background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)',
+          boxShadow: '0 2px 8px rgba(2, 132, 199, 0.06)',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -144,9 +146,9 @@ export default function MainLayout() {
           }}
         >
           {/* Logo */}
-        <Link to="/" style={{ textDecoration: 'none' }}>
-  <NearCartLogo size="medium" showFoodDisk={true} />
-</Link>
+          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
+            <NearCartLogo size="medium" showText={true} />
+          </Link>
 
           {/* Desktop Icon-Based Navigation */}
           <nav
@@ -440,6 +442,8 @@ export default function MainLayout() {
               flexDirection: 'column',
               gap: '0.6rem',
               boxShadow: '0 8px 20px rgba(0,0,0,0.06)',
+              overflowY: 'auto',
+              maxHeight: 'calc(100vh - 4.5rem)'
             }}
           >
             <NavLink

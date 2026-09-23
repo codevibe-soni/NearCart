@@ -18,7 +18,7 @@ export default function NearCartLoader({ fullScreen = true, message = "Loading N
       <div className="nearcart-loader-content">
         {/* Animated Branded Logo */}
         <div className="nearcart-loader-logo-wrap">
-          <NearCartLogo size="large" showText={true} />
+          <NearCartLogo size="large" showText={false} />
         </div>
 
         {/* Sequential 3 Animated Dots */}

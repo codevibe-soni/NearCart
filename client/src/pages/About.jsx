@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import NearCartLogo from '../components/NearCartLogo';
 import {
   Store,
   ShoppingCart,
@@ -30,10 +29,10 @@ export default function About() {
       {/* 1. Hero Section */}
       <section
         style={{
-          background: 'linear-gradient(135deg, #041d14 0%, #0c3e2e 100%)',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
           color: '#ffffff',
           padding: '4rem 1.5rem 4.5rem 1.5rem',
-          borderBottom: '3px solid #10b981',
+          borderBottom: '3px solid #0284c7',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -49,16 +48,15 @@ export default function About() {
               gap: '0.5rem',
               padding: '0.35rem 0.85rem',
               borderRadius: '9999px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(52, 211, 153, 0.3)',
-              color: '#34d399',
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              color: '#38bdf8',
               fontSize: '0.8rem',
               fontWeight: '800',
               marginBottom: '1.25rem',
               letterSpacing: '0.5px',
             }}
           >
-            <NearCartLogo size="small" variant="dark" />
             <span>HYPERLOCAL SHOPPING PLATFORM</span>
           </div>
 
@@ -78,7 +76,7 @@ export default function About() {
             style={{
               fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)',
               fontWeight: '700',
-              color: '#34d399',
+              color: '#38bdf8',
               marginBottom: '1.5rem',
             }}
           >
@@ -108,11 +106,11 @@ export default function About() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
                 color: '#ffffff',
                 textDecoration: 'none',
                 borderRadius: '0.5rem',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)',
               }}
             >
               Explore Products <ArrowRight size={16} />
@@ -154,12 +152,12 @@ export default function About() {
               }}
             >
               {[
-                { label: 'Groceries & Staples', icon: '🛒' },
-                { label: 'Stationery & Supplies', icon: '📚' },
-                { label: 'Personal Care Essentials', icon: '🧴' },
-                { label: 'Fruits & Beverages', icon: '🥤' },
-                { label: 'Daily Use Products', icon: '📦' },
-                { label: 'Local Store Specialties', icon: '🏪' },
+                { label: 'Groceries & Staples', icon: <ShoppingCart size={20} /> },
+                { label: 'Stationery & Supplies', icon: <Store size={20} /> },
+                { label: 'Personal Care Essentials', icon: <Sparkles size={20} /> },
+                { label: 'Fruits & Beverages', icon: <Tag size={20} /> },
+                { label: 'Daily Use Products', icon: <PackageCheck size={20} /> },
+                { label: 'Local Store Specialties', icon: <Navigation size={20} /> },
               ].map((item, idx) => (
                 <div
                   key={idx}
@@ -176,7 +174,7 @@ export default function About() {
                     color: 'var(--text-primary, #0f172a)',
                   }}
                 >
-                  <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', color: '#0284c7' }}>{item.icon}</span>
                   <span>{item.label}</span>
                 </div>
               ))}
@@ -185,7 +183,7 @@ export default function About() {
             {/* Seamless 4-Node Flow Bar */}
             <div
               style={{
-                background: 'linear-gradient(135deg, #041d14 0%, #093325 100%)',
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                 color: '#ffffff',
                 padding: '1.25rem 1.5rem',
                 borderRadius: '0.75rem',
@@ -196,7 +194,7 @@ export default function About() {
                 gap: '1rem',
               }}
             >
-              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Fulfillment Connection Flow:
               </span>
               <div
@@ -210,12 +208,12 @@ export default function About() {
                 }}
               >
                 <span>Customer</span>
-                <span style={{ color: '#34d399' }}>➔</span>
+                <span style={{ color: '#38bdf8' }}>➔</span>
                 <span>Local Shop</span>
-                <span style={{ color: '#34d399' }}>➔</span>
+                <span style={{ color: '#38bdf8' }}>➔</span>
                 <span>Delivery Partner</span>
-                <span style={{ color: '#34d399' }}>➔</span>
-                <span style={{ color: '#34d399' }}>Doorstep Delivery</span>
+                <span style={{ color: '#38bdf8' }}>➔</span>
+                <span style={{ color: '#38bdf8' }}>Doorstep Delivery</span>
               </div>
             </div>
           </div>
@@ -382,8 +380,8 @@ export default function About() {
                       width: '2.5rem',
                       height: '2.5rem',
                       borderRadius: '0.5rem',
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      color: '#059669',
+                      background: 'rgba(2, 132, 199, 0.1)',
+                      color: '#0284c7',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -522,15 +520,15 @@ export default function About() {
           {/* Privacy & Safety Section */}
           <div
             style={{
-              background: 'linear-gradient(135deg, #041d14 0%, #093325 100%)',
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
               color: '#ffffff',
               borderRadius: '0.85rem',
               padding: '1.75rem',
-              border: '1px solid rgba(52, 211, 153, 0.2)',
+              border: '1px solid rgba(2, 132, 199, 0.2)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <ShieldCheck size={22} style={{ color: '#34d399' }} />
+              <ShieldCheck size={22} style={{ color: '#38bdf8' }} />
               <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#ffffff', margin: 0 }}>
                 Your Privacy Matters
               </h3>
@@ -538,7 +536,7 @@ export default function About() {
             <p style={{ fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.6', marginBottom: '1rem' }}>
               NearCart is designed with privacy in mind. The application uses account authentication and only uses information needed to provide and manage the services available through the platform.
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: '#34d399', fontWeight: '700' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: '#38bdf8', fontWeight: '700' }}>
               <Lock size={14} />
               <span>Never share your password or OTP with anyone.</span>
             </div>
@@ -570,13 +568,13 @@ export default function About() {
             style={{
               maxWidth: '480px',
               margin: '0 auto',
-              background: 'linear-gradient(135deg, #041d14 0%, #062b1e 100%)',
+              background: 'linear-gradient(135deg, #0f172a 0%, #0f172a 100%)',
               color: '#ffffff',
               borderRadius: '1rem',
               padding: '1.75rem 1.5rem',
               textAlign: 'center',
-              border: '1px solid rgba(52, 211, 153, 0.25)',
-              boxShadow: '0 8px 24px rgba(4, 29, 20, 0.2)',
+              border: '1px solid rgba(2, 132, 199, 0.25)',
+              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.2)',
             }}
           >
             <div
@@ -586,7 +584,7 @@ export default function About() {
                 gap: '0.4rem',
                 fontSize: '0.75rem',
                 fontWeight: '800',
-                color: '#34d399',
+                color: '#38bdf8',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
                 marginBottom: '0.75rem',

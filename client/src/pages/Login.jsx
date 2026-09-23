@@ -1,8 +1,6 @@
-import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
-import NearCartLogo from '../components/NearCartLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -50,9 +48,6 @@ export default function Login() {
     <div className="container" style={{ padding: '4rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
       <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem 2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <NearCartLogo size="large" />
-          </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>Welcome Back</h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Sign in to your NearCart account</p>
         </div>

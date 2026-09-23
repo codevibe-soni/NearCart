@@ -11,10 +11,10 @@ import React from 'react';
  */
 export default function NearCartLogo({ size = 'medium', showText = true, textColor, variant = 'light' }) {
   const dimensions = {
-    small: { iconBg: '1.8rem', iconSize: 14, fontSize: '1.1rem', badge: '0.7rem' },
-    medium: { iconBg: '2.2rem', iconSize: 18, fontSize: '1.35rem', badge: '0.75rem' },
-    large: { iconBg: '2.8rem', iconSize: 24, fontSize: '1.75rem', badge: '0.85rem' },
-  }[size] || { iconBg: '2.2rem', iconSize: 18, fontSize: '1.35rem', badge: '0.75rem' };
+    small: { iconBg: '1.75rem', iconSize: 20 },
+    medium: { iconBg: '2.1rem', iconSize: 28 },
+    large: { iconBg: '3.5rem', iconSize: 36 },
+  }[size] || { iconBg: '2.1rem', iconSize: 28 };
 
   // Determine text colors based on variant
   const isDark = variant === 'dark';
@@ -24,26 +24,49 @@ export default function NearCartLogo({ size = 'medium', showText = true, textCol
     : 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)';
 
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', userSelect: 'none' }}>
-      <img src="/logo.png" alt="NearCart logo" style={{ width: dimensions.iconBg, height: dimensions.iconBg }} />
+    <div style={{
+      display: 'inline-flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '0.15rem',
+      userSelect: 'none',
+      width: '100%',
+      maxWidth: '160px',
+      margin: '0 auto',
+      textAlign: 'center'
+    }}>
+      <img src="/logo.png" alt="NearCart logo" style={{
+        width: dimensions.iconBg,
+        height: 'auto',
+        objectFit: 'contain',
+        maxWidth: '100%',
+        flexShrink: 0
+      }} />
 
       {showText && (
-        <span
+        <div
           style={{
-            fontSize: dimensions.fontSize,
-            fontWeight: '800',
-            color: nearColor,
-            letterSpacing: '-0.03em',
-            fontFamily: "'Inter', sans-serif",
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.15rem',
-            marginTop: '0.25rem',
             width: '100%',
+            textAlign: 'center'
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+          <div style={{
+            fontSize: 'clamp(0.62rem, 2.5vw, 0.9rem)',
+            fontWeight: '800',
+            color: nearColor,
+            letterSpacing: '-0.02em',
+            fontFamily: "'Inter', sans-serif",
+            lineHeight: '1.1',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.1rem'
+          }}>
             <span>NearCart+</span>
             <span
               style={{
@@ -54,15 +77,18 @@ export default function NearCartLogo({ size = 'medium', showText = true, textCol
             >
               FoodDisk
             </span>
-          </span>
-          <span style={{
-            fontSize: '0.73rem',
+          </div>
+          <div style={{
+            fontSize: 'clamp(0.5rem, 2vw, 0.65rem)',
             fontWeight: '600',
             fontStyle: 'italic',
             color: '#64748b',
-            marginTop: '0.1rem'
-          }}>Food · Grocery · More</span>
-        </span>
+            marginTop: '0.1rem',
+            lineHeight: '1.1',
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}>Food · Grocery · More</div>
+        </div>
       )}
     </div>
   );

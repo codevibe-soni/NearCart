@@ -8,7 +8,6 @@ import {
   ShopCard,
   LoadingSpinner,
 } from '../components/StudentUIComponents';
-import NearCartLogo from '../components/NearCartLogo';
 import { Store, Compass, ArrowRight } from 'lucide-react';
 
 export default function Student() {
@@ -120,7 +119,7 @@ export default function Student() {
       >
         <div style={{ maxWidth: '650px', position: 'relative', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <NearCartLogo size="small" />
+            
             <span
               style={{
                 padding: '0.2rem 0.6rem',

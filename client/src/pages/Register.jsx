@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserPlus, AlertCircle, Eye, EyeOff, Info } from 'lucide-react';
-import NearCartLogo from '../components/NearCartLogo';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -64,9 +63,6 @@ export default function Register() {
     <div className="container" style={{ padding: '3.5rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
       <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '2.5rem 2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <NearCartLogo size="large" />
-          </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>Create Student Account</h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Get started with NearCart local delivery</p>
         </div>
