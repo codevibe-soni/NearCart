@@ -278,6 +278,31 @@ export const deleteUserAdmin = async (req, res, next) => {
     next(error);
   }
 };
+
+// @route   DELETE /api/admin/payments/:id
+// @desc    Permanently delete a payment record (admin only)
+// @access  Private/Admin
+export const deletePaymentAdmin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid payment ID.' });
+    }
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ success: false, message: 'Admin permission required.' });
+    }
+    const Payment = mongoose.model('Payment');
+    const payment = await Payment.findById(id);
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment not found.' });
+    }
+    await payment.deleteOne();
+    console.log(`[ADMIN AUDIT] Admin ${req.user._id} deleted payment ${id}.`);
+    return res.status(200).json({ success: true, message: 'Payment record deleted.' });
+  } catch (error) {
+    next(error);
+  }
+};
 /**
  * @desc    Preview estimated document counts for cleanup targets
  * @route   POST /api/admin/clean-data/preview

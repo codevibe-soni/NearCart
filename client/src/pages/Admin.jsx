@@ -46,6 +46,7 @@ export default function Admin() {
   const [paymentsList, setPaymentsList] = useState([]);
   const [paymentStats, setPaymentStats] = useState(null);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState(null);
 
   // PWA App Installation Analytics State
   const [installStats, setInstallStats] = useState(null);
@@ -76,6 +77,23 @@ export default function Admin() {
       console.error('Failed to fetch payment management data:', err);
     } finally {
       setLoadingPayments(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this payment record? This action cannot be undone.')) return;
+    try {
+      setDeletingPaymentId(paymentId);
+      const res = await api.delete(`/admin/payments/${paymentId}`);
+      if (res && res.success) {
+        setPaymentsList((prev) => prev.filter((p) => p._id !== paymentId));
+      } else {
+        alert(res?.message || 'Failed to delete payment');
+      }
+    } catch (err) {
+      alert(err?.message || 'Failed to delete payment');
+    } finally {
+      setDeletingPaymentId(null);
     }
   };
 
@@ -576,6 +594,7 @@ export default function Admin() {
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Status</th>
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Razorpay Order ID</th>
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Payment / Txn ID</th>
+                    <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>

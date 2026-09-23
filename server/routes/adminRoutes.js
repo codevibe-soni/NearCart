@@ -4,6 +4,7 @@ import {
   getAllUsers,
   updateUserStatus,
   deleteUserAdmin,
+  deletePaymentAdmin,
   getAllShops,
   updateShopStatus,
   deleteShopAdmin,
@@ -27,6 +28,7 @@ router.delete('/users/:id', deleteUserAdmin);
 router.get('/shops', getAllShops);
 router.patch('/shops/:id/status', updateShopStatus);
 router.delete('/shops/:id', deleteShopAdmin);
+router.delete('/payments/:id', deletePaymentAdmin);
 
 // PWA App Installation Analytics for Admin Dashboard
 router.get('/analytics/installations', getInstallationAnalytics);
