@@ -276,4 +276,129 @@ img, svg, video, canvas, audio {
   }
 }
 
+/* ──────────────────────────────────────────────────
+   GLOBAL OVERFLOW PROTECTION
+   ────────────────────────────────────────────────── */
+html {
+  overflow-x: hidden;
+}
 
+/* Prevent any element from forcing horizontal scroll */
+.container, main, section, article, header, nav, footer {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Long shop/hotel name wrapping everywhere */
+.shop-name, h1, h2, h3, h4 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+/* ──────────────────────────────────────────────────
+   AUTH PAGES — LOGIN & REGISTER
+   ────────────────────────────────────────────────── */
+@media (max-width: 520px) {
+  /* Login and register containers */
+  div.container > div.glass-card {
+    margin: 0 auto;
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0.75rem !important;
+    padding: 1.5rem 1.1rem !important;
+  }
+
+  /* Google login button — always full width */
+  div[style*="display: flex"][style*="justifyContent: center"] {
+    width: 100% !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   SHOP CARD — LONG NAME FIX
+   ────────────────────────────────────────────────── */
+.glass-card h4 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  /* Clamp to 2 lines max on cards */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ──────────────────────────────────────────────────
+   NOTIFICATION DROPDOWN — MOBILE FIX
+   ────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Notification dropdown should not overflow on small screens */
+  .notif-dropdown {
+    width: calc(100vw - 1.5rem) !important;
+    right: -1rem !important;
+    max-width: 340px !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   SHOPKEEPER CLOSING SCHEDULE UI — MOBILE
+   ────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Weekly day pills wrap cleanly */
+  .closing-day-pills {
+    flex-wrap: wrap;
+    gap: 0.35rem !important;
+  }
+
+  /* Special date add form stacks vertically */
+  .special-date-add-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .special-date-add-row > * {
+    width: 100% !important;
+    flex: none !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   FOOTER — ALWAYS VISIBLE, RESPONSIVE
+   ────────────────────────────────────────────────── */
+
+/* On mobile the footer renders above the fixed bottom nav.
+   We add padding-bottom to the footer so it doesn't hide under the nav. */
+@media (max-width: 768px) {
+  .main-footer {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   SHOP DETAILS PAGE — CLOSED BANNER MOBILE
+   ────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Closed reason banner in ShopDetails must not overflow */
+  .closed-reason-banner {
+    flex-wrap: wrap;
+    padding: 0.5rem 0.65rem !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────
+   STUDENT PAGE SHOP GRID — RESPONSIVE
+   ────────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  /* Shop listing grid: single column on very small screens */
+  div[style*="gridTemplateColumns"][style*="260px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 541px) and (max-width: 768px) {
+  /* 2-column grid on medium-small screens */
+  div[style*="gridTemplateColumns"][style*="260px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

@@ -71,6 +71,26 @@ const shopSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Closing Schedule: recurring weekly off-days
+    weeklyClosingDays: {
+      type: [String],
+      enum: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      default: [],
+    },
+    // Closing Schedule: specific date-based closures
+    specialClosingDates: [
+      {
+        date: {
+          type: String, // YYYY-MM-DD format
+          required: true,
+        },
+        reason: {
+          type: String,
+          trim: true,
+          default: '',
+        },
+      },
+    ],
     minimumOrderAmount: {
       type: Number,
       default: 0,

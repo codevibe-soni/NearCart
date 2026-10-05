@@ -85,8 +85,8 @@ export default function Login() {
   };
 
   return (
-    <div className="container" style={{ padding: '4rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem 2rem' }}>
+    <div className="container" style={{ paddingTop: '2.5rem', paddingBottom: '6rem', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: '440px', boxSizing: 'border-box' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>Welcome Back</h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Sign in to your NearCart account</p>

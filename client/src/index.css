@@ -21,6 +21,9 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   line-height: 1.5;
+  /* Prevent horizontal overflow globally */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 a {
@@ -32,6 +35,9 @@ a {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  /* Ensure container never causes overflow */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 img {
@@ -46,6 +52,10 @@ img {
   padding: 1.5rem;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  /* Prevent long content from breaking cards */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .glass-card:hover {
@@ -69,11 +79,113 @@ img {
   background-color: var(--primary-hover);
 }
 
+/* ── Auth Pages (Login / Register) ── */
+.auth-page-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: calc(100vh - 4.5rem);
+  padding: 2rem 1rem 6rem 1rem;
+}
 
-/* Mobile-specific styles */
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  box-sizing: border-box;
+}
+
+/* ── Shop/Hotel name clamping ── */
+.shop-name-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+/* ── Responsive Shop Grid ── */
+.shops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* ── Mobile: bottom nav spacer ── */
+.mobile-bottom-spacer {
+  height: 5.5rem;
+  display: none;
+}
+
+/* ── Mobile: footer always visible (never hide with display:none) ── */
+/* The footer IS shown on mobile — it stacks above the bottom nav */
+
+/* ──────────────────────────────────────────────
+   RESPONSIVE BREAKPOINTS
+   ────────────────────────────────────────────── */
+
+/* ── 768px and below (tablets / large phones) ── */
 @media (max-width: 768px) {
-  footer { display: none !important; }
-  .mobile-bottom-nav {
-    /* already inline styles used, but ensure it stays fixed */
+  .container {
+    padding: 0 0.75rem;
+  }
+
+  .shops-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  /* Mobile bottom spacer to keep content above fixed bottom nav */
+  .mobile-bottom-spacer {
+    display: block;
+  }
+
+  /* Notifications dropdown should not overflow screen */
+  [style*="width: 320px"] {
+    max-width: calc(100vw - 2rem) !important;
+    right: 0 !important;
+  }
+}
+
+/* ── 480px and below (small phones) ── */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 0.65rem;
+  }
+
+  .shops-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .glass-card {
+    padding: 1rem !important;
+    border-radius: 0.5rem;
+  }
+
+  /* Prevent any text/content from causing horizontal scroll */
+  h1, h2, h3, h4, h5, h6, p, span, div, a, li {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+  }
+
+  /* Auth forms: full width on tiny screens */
+  .auth-card {
+    padding: 1.5rem 1rem !important;
+  }
+}
+
+/* ── 375px and below (iPhone SE, very small) ── */
+@media (max-width: 375px) {
+  .shops-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .container {
+    padding: 0 0.5rem;
   }
 }

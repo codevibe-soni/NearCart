@@ -236,7 +236,7 @@ export default function Student() {
             No shops available {selectedCategory ? `under category "${categoryTitle}"` : submittedSearch ? `matching "${submittedSearch}"` : 'at the moment'}.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
+          <div className="shops-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
             {shops.map((shopItem) => (
               <ShopCard
                 key={shopItem._id}

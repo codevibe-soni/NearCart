@@ -348,17 +348,21 @@ export default function Footer() {
           outline: none;
         }
         @media (max-width: 768px) {
-          .main-footer {
-            display: none !important;
+          .footer-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 0.85rem !important;
           }
-          .mobile-footer-spacer {
-            display: block !important;
-            height: 5.5rem;
+          .footer-container {
+            padding: 1rem 1rem 0.75rem 1rem !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .footer-grid {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>
     </footer>
-    <div className="mobile-footer-spacer" style={{ display: 'none' }}></div>
     </>
   );
 }

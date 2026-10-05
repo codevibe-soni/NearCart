@@ -348,6 +348,8 @@ export const updateShop = async (req, res, next) => {
       location,
       foodType,
       customFoodType,
+      weeklyClosingDays,
+      specialClosingDates,
     } = req.body;
 
     // Validate delivery charge slabs if provided
@@ -439,6 +441,31 @@ export const updateShop = async (req, res, next) => {
       }
     }
     if (isOpen !== undefined) shop.isOpen = Boolean(isOpen);
+
+    // --- Closing Schedule ---
+    const VALID_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    if (weeklyClosingDays !== undefined) {
+      if (!Array.isArray(weeklyClosingDays)) {
+        return res.status(400).json({ success: false, message: 'weeklyClosingDays must be an array.' });
+      }
+      const invalidDays = weeklyClosingDays.filter((d) => !VALID_DAYS.includes(d));
+      if (invalidDays.length > 0) {
+        return res.status(400).json({ success: false, message: `Invalid day(s): ${invalidDays.join(', ')}. Use full day names.` });
+      }
+      shop.weeklyClosingDays = weeklyClosingDays;
+    }
+    if (specialClosingDates !== undefined) {
+      if (!Array.isArray(specialClosingDates)) {
+        return res.status(400).json({ success: false, message: 'specialClosingDates must be an array.' });
+      }
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      for (const entry of specialClosingDates) {
+        if (!entry.date || !dateRegex.test(entry.date)) {
+          return res.status(400).json({ success: false, message: `Invalid date format "${entry.date}". Use YYYY-MM-DD.` });
+        }
+      }
+      shop.specialClosingDates = specialClosingDates;
+    }
     if (upiEnabled !== undefined) shop.upiEnabled = Boolean(upiEnabled);
     if (upiId !== undefined) shop.upiId = upiId.trim();
     if (upiQrImage !== undefined) {

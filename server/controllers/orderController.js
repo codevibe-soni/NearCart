@@ -25,6 +25,49 @@ const generateOrderNumber = () => {
 };
 
 /**
+ * Helper to check if a shop is closed due to its closing schedule (weekly days / special dates).
+ * Returns a reason string if closed, or null if open by schedule.
+ */
+const isShopClosedBySchedule = (shop) => {
+  // Use IST (Asia/Kolkata = UTC+5:30) to derive the correct local date.
+  // Servers typically run in UTC; without this, the schedule check can be
+  // wrong by up to 5h30m, causing the shop to appear closed a day early/late.
+  const TZ = 'Asia/Kolkata';
+  const now = new Date();
+
+  // Build YYYY-MM-DD string in local (IST) timezone
+  const localDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now); // returns "YYYY-MM-DD" (en-CA uses ISO format)
+
+  // Get weekday name in IST
+  const localDayName = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ,
+    weekday: 'long',
+  }).format(now); // returns e.g. "Monday"
+
+  // Check special closing dates first (YYYY-MM-DD)
+  if (Array.isArray(shop.specialClosingDates) && shop.specialClosingDates.length > 0) {
+    const special = shop.specialClosingDates.find((s) => s.date === localDate);
+    if (special) {
+      return special.reason ? `Shop is closed today: ${special.reason}` : 'Shop is closed today (special holiday)';
+    }
+  }
+
+  // Check weekly closing days
+  if (Array.isArray(shop.weeklyClosingDays) && shop.weeklyClosingDays.length > 0) {
+    if (shop.weeklyClosingDays.includes(localDayName)) {
+      return `Shop is closed every ${localDayName}`;
+    }
+  }
+
+  return null;
+};
+
+/**
  * @desc    Validate and apply a coupon
  * @route   POST /api/orders/apply-coupon
  * @access  Private (Student)
@@ -235,6 +278,12 @@ export const createOrder = async (req, res) => {
         });
       }
 
+      // Check shop closing schedule
+      const scheduleCloseReason = isShopClosedBySchedule(shop);
+      if (scheduleCloseReason) {
+        return res.status(400).json({ success: false, message: scheduleCloseReason });
+      }
+
       // Calculate server-side effective selling price
       const effectivePrice =
         product.discountPrice != null && product.discountPrice < product.price
@@ -282,6 +331,12 @@ export const createOrder = async (req, res) => {
           success: false,
           message: 'The shop associated with your cart is not available',
         });
+      }
+
+      // Check shop closing schedule
+      const scheduleCloseReason = isShopClosedBySchedule(shop);
+      if (scheduleCloseReason) {
+        return res.status(400).json({ success: false, message: scheduleCloseReason });
       }
 
       for (const item of cart.items) {

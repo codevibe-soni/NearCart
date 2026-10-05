@@ -104,10 +104,61 @@ export function formatTimeAMPM(timeStr) {
   return `${strHours}:${minutes} ${ampm}`;
 }
 
+/** Returns a reason string if closed due to schedule, or null if not scheduled-closed */
+export function getShopClosedReason(shop) {
+  if (!shop) return null;
+  const now = new Date();
+
+  // Use Intl.DateTimeFormat to extract the local YYYY-MM-DD calendar date safely.
+  const localDate = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now); // yields "YYYY-MM-DD"
+
+  const localDayName = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+  }).format(now); // yields e.g. "Sunday"
+
+  // 1. Check special closing dates first (stored as YYYY-MM-DD strings or objects)
+  if (Array.isArray(shop.specialClosingDates) && shop.specialClosingDates.length > 0) {
+    const special = shop.specialClosingDates.find((s) => {
+      if (!s) return false;
+      const sDateRaw = typeof s === 'string' ? s : s.date;
+      if (!sDateRaw) return false;
+      const cleanSDate = String(sDateRaw).trim().split('T')[0];
+      return cleanSDate === localDate;
+    });
+    if (special) {
+      return special.reason ? `Closed today: ${special.reason}` : 'Closed today';
+    }
+  }
+
+  // 2. Check weekly closing days (case-insensitive & short-name tolerant)
+  if (Array.isArray(shop.weeklyClosingDays) && shop.weeklyClosingDays.length > 0) {
+    const isWeeklyClosed = shop.weeklyClosingDays.some((day) => {
+      if (!day || typeof day !== 'string') return false;
+      const d = day.trim().toLowerCase();
+      const full = localDayName.toLowerCase();
+      const short = full.slice(0, 3);
+      return d === full || d === short;
+    });
+    if (isWeeklyClosed) {
+      return `Closed every ${localDayName}`;
+    }
+  }
+
+  return null;
+}
+
 export function isShopOpen(shop) {
   if (!shop) return false;
   if (shop.isActive === false || shop.isApproved === false) return false;
   if (shop.isOpen === false) return false;
+
+  // Check closing schedule before time window
+  if (getShopClosedReason(shop)) return false;
+
   if (!shop.openingTime || !shop.closingTime) return shop.isOpen !== false;
 
   const parseMinutes = (tStr) => {
@@ -146,6 +197,7 @@ export function isShopOpen(shop) {
 export function ShopCard({ shop, onClick }) {
   const hasTiming = Boolean(shop.openingTime && shop.closingTime);
   const currentlyOpen = isShopOpen(shop);
+  const closedReason = !currentlyOpen ? getShopClosedReason(shop) : null;
   const shopImage = shop.logo || shop.coverImage;
   const openTimeFormatted = hasTiming ? formatTimeAMPM(shop.openingTime) : '';
   const closeTimeFormatted = hasTiming ? formatTimeAMPM(shop.closingTime) : '';
@@ -200,19 +252,27 @@ export function ShopCard({ shop, onClick }) {
           </div>
         </div>
 
-        <span
-          style={{
-            padding: '0.2rem 0.6rem',
-            borderRadius: '9999px',
-            fontSize: '0.75rem',
-            fontWeight: '600',
-            background: !hasTiming ? '#f1f5f9' : currentlyOpen ? '#d1fae5' : '#fee2e2',
-            color: !hasTiming ? '#64748b' : currentlyOpen ? '#047857' : '#b91c1c',
-            border: `1px solid ${!hasTiming ? '#cbd5e1' : currentlyOpen ? '#a7f3d0' : '#fca5a5'}`,
-          }}
-        >
-          {!hasTiming ? 'Hours not set' : currentlyOpen ? 'OPEN' : 'CLOSED'}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem', flexShrink: 0 }}>
+          <span
+            style={{
+              padding: '0.2rem 0.6rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              background: !currentlyOpen ? '#fee2e2' : !hasTiming ? '#f1f5f9' : '#d1fae5',
+              color: !currentlyOpen ? '#b91c1c' : !hasTiming ? '#64748b' : '#047857',
+              border: `1px solid ${!currentlyOpen ? '#fca5a5' : !hasTiming ? '#cbd5e1' : '#a7f3d0'}`,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {!currentlyOpen ? 'CLOSED' : !hasTiming ? 'Hours not set' : 'OPEN'}
+          </span>
+          {closedReason && (
+            <span style={{ fontSize: '0.68rem', color: '#b91c1c', textAlign: 'right', maxWidth: '120px', lineHeight: '1.2' }}>
+              {closedReason}
+            </span>
+          )}
+        </div>
       </div>
 
       <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', flex: 1 }}>
@@ -241,6 +301,7 @@ export function ShopCard({ shop, onClick }) {
     </div>
   );
 }
+
 
 export const ProductCard = React.memo(function ProductCard({ product, onClick, onShopClick }) {
   const hasDiscount = product.discountPrice !== undefined && product.discountPrice !== null && product.discountPrice < product.price;

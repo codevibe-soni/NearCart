@@ -95,8 +95,8 @@ export default function Register() {
   };
 
   return (
-    <div className="container" style={{ padding: '3.5rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '2.5rem 2rem' }}>
+    <div className="container" style={{ paddingTop: '2rem', paddingBottom: '6rem', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: '480px', boxSizing: 'border-box' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>Create Student Account</h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Get started with NearCart local delivery</p>

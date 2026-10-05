@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { getShopById, getProducts, getCategories } from '../../services/studentService';
-import { ProductCard, LoadingSpinner, EmptyState, SearchBar, CategoryCard, formatTimeAMPM, isShopOpen } from '../../components/StudentUIComponents';
+import { ProductCard, LoadingSpinner, EmptyState, SearchBar, CategoryCard, formatTimeAMPM, isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
 import { Store, ArrowLeft, Phone, MapPin, Star, Clock, Tag } from 'lucide-react';
 import api from '../../services/api';
 
@@ -132,6 +132,7 @@ export default function ShopDetails() {
 
   const hasTiming = Boolean(shop.openingTime && shop.closingTime);
   const currentlyOpen = isShopOpen(shop);
+  const closedReason = !currentlyOpen ? getShopClosedReason(shop) : null;
   const shopImage = shop.logo || shop.coverImage;
   const openTimeFormatted = hasTiming ? formatTimeAMPM(shop.openingTime) : '';
   const closeTimeFormatted = hasTiming ? formatTimeAMPM(shop.closingTime) : '';
@@ -211,13 +212,13 @@ export default function ShopDetails() {
                   borderRadius: '9999px',
                   fontSize: '0.75rem',
                   fontWeight: '700',
-                  background: !hasTiming ? 'rgba(100, 116, 139, 0.15)' : currentlyOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                  color: !hasTiming ? '#64748b' : currentlyOpen ? 'var(--success)' : 'var(--danger)',
+                  background: !currentlyOpen ? 'rgba(239, 68, 68, 0.15)' : !hasTiming ? 'rgba(100, 116, 139, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                  color: !currentlyOpen ? 'var(--danger)' : !hasTiming ? '#64748b' : 'var(--success)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}
               >
-                {!hasTiming ? 'Hours not set' : currentlyOpen ? 'OPEN' : 'CLOSED'}
+                {!currentlyOpen ? 'CLOSED' : !hasTiming ? 'Hours not set' : 'OPEN'}
               </span>
               {shop.foodType && (
                 <span
@@ -236,6 +237,14 @@ export default function ShopDetails() {
                 </span>
               )}
             </div>
+
+            {/* Closing Schedule Reason Banner */}
+            {!currentlyOpen && closedReason && (
+              <div className="closed-reason-banner" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '0.5rem', marginTop: '0.5rem', marginBottom: '0.25rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>
+                <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>🔴</span>
+                <span style={{ fontSize: '0.82rem', color: '#b91c1c', fontWeight: '600', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{closedReason}</span>
+              </div>
+            )}
 
             <p style={{
               color: 'var(--text-secondary)',
