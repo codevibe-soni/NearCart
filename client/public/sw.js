@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nearcart-v3';
+const CACHE_NAME = 'nearcart-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -59,17 +59,18 @@ try {
   console.warn('[ServiceWorker FCM] Compat script notice:', err.message);
 }
 
-// Install Event - Pre-cache App Shell
+// Install Event - Pre-cache App Shell & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[ServiceWorker] Pre-caching App Shell');
       return cache.addAll(STATIC_ASSETS);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
-// Activate Event - Clean old caches
+// Activate Event - Clean old caches & Claim Clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -87,20 +88,28 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event - Safe caching policy
 self.addEventListener('fetch', (event) => {
+  // 1. Immediately bypass ALL non-GET requests (POST, PUT, DELETE, PATCH, etc.)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   const url = new URL(event.request.url);
 
-  // Exclude non-GET requests, API requests, and Socket.IO connections from caching
+  // 2. Immediately bypass cross-origin, API, socket.io, backend, and external service requests
   if (
-    event.request.method !== 'GET' ||
+    url.origin !== self.location.origin ||
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/socket.io') ||
     url.hostname.includes('onrender.com') ||
-    url.hostname.includes('razorpay.com')
+    url.hostname.includes('razorpay.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('gstatic.com') ||
+    url.hostname.includes('firebaseio.com')
   ) {
-    return; // Pass through to network directly
+    return;
   }
 
-  // SPA Navigation requests -> Network first, fallback to cached index.html
+  // 3. SPA Navigation requests -> Network first, fallback to cached index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -110,7 +119,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets (JS, CSS, Images) -> Stale while revalidate
+  // 4. Same-origin Static Assets (JS, CSS, Images) -> Stale while revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

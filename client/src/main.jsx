@@ -42,6 +42,8 @@ if ('serviceWorker' in navigator) {
       .register('/sw.js', { scope: '/' })
       .then((registration) => {
         console.log('NearCart Service Worker registered:', registration.scope);
+        // Force update check to ensure users get the latest sw.js immediately
+        registration.update().catch(() => {});
       })
       .catch((error) => {
         console.error('NearCart Service Worker registration failed:', error);
