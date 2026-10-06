@@ -11,6 +11,7 @@ export default function Register() {
     phone: '',
     password: '',
     confirmPassword: '',
+    customerType: 'STUDENT',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -79,7 +80,8 @@ export default function Register() {
         formData.name,
         formData.email,
         formData.phone,
-        formData.password
+        formData.password,
+        formData.customerType
       );
 
       if (res.success) {
@@ -98,7 +100,7 @@ export default function Register() {
     <div className="container" style={{ paddingTop: '2rem', paddingBottom: '6rem', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
       <div className="glass-card" style={{ width: '100%', maxWidth: '480px', boxSizing: 'border-box' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>Create Student Account</h2>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--text-primary)' }}>Create Student / Atithi Account</h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Get started with NearCart local delivery</p>
         </div>
 
@@ -213,6 +215,20 @@ export default function Register() {
           </div>
 
           <div className="form-group">
+            <label className="form-label">Customer Type</label>
+            <select
+              name="customerType"
+              className="form-input"
+              value={formData.customerType}
+              onChange={handleChange}
+              style={{ background: '#ffffff', color: 'var(--text-primary)' }}
+            >
+              <option value="STUDENT">Student (Hostel / Campus)</option>
+              <option value="ATITHI">Atithi (Guest / Visitor)</option>
+            </select>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Confirm Password</label>
             <input
               type="password"
@@ -231,7 +247,7 @@ export default function Register() {
             disabled={submitting}
             style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem' }}
           >
-            {submitting ? 'Creating Account...' : 'Register as Student'}
+            {submitting ? 'Creating Account...' : `Register as ${formData.customerType === 'ATITHI' ? 'Atithi' : 'Student / Atithi'}`}
           </button>
         </form>
 

@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: 'STUDENT',
     },
+    customerType: {
+      type: String,
+      enum: {
+        values: ['STUDENT', 'ATITHI'],
+        message: '{VALUE} is not a valid customer type',
+      },
+      default: 'STUDENT',
+    },
     accountStatus: {
       type: String,
       enum: {

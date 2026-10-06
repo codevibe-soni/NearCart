@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { detectUserLocality } from '../../utils/locationService';
-import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2 } from 'lucide-react';
+import { isShopOpen } from '../../components/StudentUIComponents';
+import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2, Lock } from 'lucide-react';
 
 export default function CheckoutPage() {
+  const { user } = useAuth();
   const location = useLocation();
   const buyNowItem = location.state?.buyNowItem || null;
 
@@ -26,16 +29,17 @@ export default function CheckoutPage() {
   const [locationMessage, setLocationMessage] = useState('');
   const [detectedLocalityInfo, setDetectedLocalityInfo] = useState(null);
 
-  // Manual Delivery Distance State
-  const [distanceInput, setDistanceInput] = useState('');
+  // Automatic Delivery Estimation State
   const [calculatedDistanceInfo, setCalculatedDistanceInfo] = useState(null);
-  const [distanceError, setDistanceError] = useState('');
+  const [estimatingDelivery, setEstimatingDelivery] = useState(false);
+  const [estimateError, setEstimateError] = useState('');
 
   // Address Form Modal State
 
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [hostelsList, setHostelsList] = useState([]);
   const [addressFormData, setAddressFormData] = useState({
-    label: 'HOSTEL',
+    label: user?.customerType === 'ATITHI' ? 'HOME' : 'HOSTEL',
     hostelName: '',
     roomNumber: '',
     fullAddress: '',
@@ -43,13 +47,13 @@ export default function CheckoutPage() {
     city: 'Campus Town',
     state: 'State',
     postalCode: '100001',
+    latitude: '',
+    longitude: '',
     isDefault: true,
   });
 
   const navigate = useNavigate();
 
-<<<<<<< HEAD
-=======
   const isValidLat = (val) => {
     if (val === null || val === undefined || val === '') return false;
     const num = Number(val);
@@ -95,7 +99,6 @@ export default function CheckoutPage() {
     0
   );
 
->>>>>>> 84cc885 (Mendetory pin Address)
   const handleDetectLocality = async () => {
     setLocationDetecting(true);
     setLocationMessage('');
@@ -111,6 +114,8 @@ export default function CheckoutPage() {
           state: result.state || prev.state,
           postalCode: result.postalCode || prev.postalCode,
           landmark: result.locality ? `Locality: ${result.locality}` : prev.landmark,
+          latitude: result.lat,
+          longitude: result.lng,
           isDefault: true,
         }));
         setShowAddressModal(true);
@@ -131,23 +136,48 @@ export default function CheckoutPage() {
       setLoading(true);
       setError('');
 
+      const DEFAULT_HOSTELS = ['Bhabha Hostel', 'Hostel 1', 'Hostel 5', 'Block A', 'Block B', 'Block C'];
+
       if (buyNowItem) {
-        // Buy Now flow: Only fetch delivery addresses
-        const addrRes = await api.get('/addresses');
+        // Buy Now flow: Fetch delivery addresses and hostels list
+        const [addrRes, hostelRes] = await Promise.all([
+          api.get('/addresses'),
+          api.get('/addresses/hostels').catch((err) => {
+            console.warn('Hostels list fetch failed, using fallback list:', err);
+            return { success: false, data: [] };
+          }),
+        ]);
         if (addrRes && addrRes.success) {
           const addrList = addrRes.data || [];
           setAddresses(addrList);
           const defaultAddr = addrList.find((a) => a.isDefault) || addrList[0];
           if (defaultAddr) {
             setSelectedAddressId(defaultAddr._id);
+          } else {
+            setSelectedAddressId('');
           }
         }
+        if (hostelRes && hostelRes.success && Array.isArray(hostelRes.data) && hostelRes.data.length > 0) {
+          setHostelsList(hostelRes.data);
+        } else {
+          setHostelsList(DEFAULT_HOSTELS);
+        }
       } else {
-        // Cart flow: Fetch cart and addresses
-        const [cartRes, addrRes] = await Promise.all([
+        // Cart flow: Fetch cart, addresses, and hostels list
+        const [cartRes, addrRes, hostelRes] = await Promise.all([
           api.get('/cart'),
           api.get('/addresses'),
+          api.get('/addresses/hostels').catch((err) => {
+            console.warn('Hostels list fetch failed, using fallback list:', err);
+            return { success: false, data: [] };
+          }),
         ]);
+
+        if (hostelRes && hostelRes.success && Array.isArray(hostelRes.data) && hostelRes.data.length > 0) {
+          setHostelsList(hostelRes.data);
+        } else {
+          setHostelsList(DEFAULT_HOSTELS);
+        }
 
         if (cartRes && cartRes.success) {
           setCart(cartRes.data);
@@ -163,6 +193,8 @@ export default function CheckoutPage() {
           const defaultAddr = addrList.find((a) => a.isDefault) || addrList[0];
           if (defaultAddr) {
             setSelectedAddressId(defaultAddr._id);
+          } else {
+            setSelectedAddressId('');
           }
         }
       }
@@ -216,14 +248,20 @@ export default function CheckoutPage() {
     }
 
     try {
-      const res = await api.post('/addresses', addressFormData);
+      const payload = {
+        ...addressFormData,
+        label: user?.customerType === 'ATITHI' ? 'HOME' : addressFormData.label,
+        hostelName: (user?.customerType === 'ATITHI' || addressFormData.label === 'HOME') ? '' : addressFormData.hostelName,
+        roomNumber: (user?.customerType === 'ATITHI' || addressFormData.label === 'HOME') ? '' : addressFormData.roomNumber,
+      };
+      const res = await api.post('/addresses', payload);
       if (res && res.success) {
         const newAddress = res.data;
         setAddresses([newAddress, ...addresses]);
         setSelectedAddressId(newAddress._id);
         setShowAddressModal(false);
         setAddressFormData({
-          label: 'HOSTEL',
+          label: user?.customerType === 'ATITHI' ? 'HOME' : 'HOSTEL',
           hostelName: '',
           roomNumber: '',
           fullAddress: '',
@@ -239,58 +277,63 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleCalculateDelivery = (overrideVal) => {
-    setDistanceError('');
-    const val = overrideVal !== undefined ? overrideVal : distanceInput;
-    if (val === '' || val === null || val === undefined) {
-      setDistanceError('Please enter distance from shop.');
-      setCalculatedDistanceInfo(null);
-      return;
-    }
-
-    const distNum = Number(val);
-    if (isNaN(distNum) || !isFinite(distNum) || distNum < 0 || distNum > 100) {
-      setDistanceError('Please enter a valid delivery distance (0–100 km).');
-      setCalculatedDistanceInfo(null);
-      return;
-    }
-
-    const slabs = shop?.deliveryChargeSlabs || [];
-    let fee = shop?.deliveryFee !== undefined ? Number(shop.deliveryFee) : 0;
-
-    if (slabs.length > 0) {
-      const sorted = [...slabs].sort((x, y) => Number(x.minDistanceKm) - Number(y.minDistanceKm));
-      const exact = sorted.find((s) => distNum >= Number(s.minDistanceKm) && distNum <= Number(s.maxDistanceKm));
-      if (exact) {
-        fee = Number(exact.charge);
-      } else if (distNum <= Number(sorted[0].minDistanceKm)) {
-        fee = Number(sorted[0].charge);
-      } else {
-        const upper = sorted.find((s) => distNum <= Number(s.maxDistanceKm));
-        if (upper) {
-          fee = Number(upper.charge);
-        } else {
-          fee = Number(sorted[sorted.length - 1].charge);
-        }
+  useEffect(() => {
+    const fetchDeliveryEstimate = async () => {
+      const targetShopId = shop?._id || shop;
+      if (!selectedAddressId || !targetShopId) {
+        setCalculatedDistanceInfo(null);
+        setEstimateError('');
+        return;
       }
-    }
 
-    setCalculatedDistanceInfo({
-      distanceKm: Math.round(distNum * 100) / 100,
-      deliveryFee: fee,
-    });
-  };
+      try {
+        setEstimatingDelivery(true);
+        setEstimateError('');
+        const res = await api.post('/orders/delivery-estimate', {
+          shopId: typeof targetShopId === 'object' ? targetShopId._id : targetShopId,
+          addressId: selectedAddressId,
+        });
+
+        if (res && res.success) {
+          setCalculatedDistanceInfo({
+            distanceKm: res.distanceKm,
+            deliveryFee: res.deliveryFee,
+          });
+        } else {
+          setCalculatedDistanceInfo(null);
+          setEstimateError(res.message || 'Failed to calculate delivery fee');
+        }
+      } catch (err) {
+        setCalculatedDistanceInfo(null);
+        setEstimateError(err.message || 'Location is not configured for this address/shop.');
+      } finally {
+        setEstimatingDelivery(false);
+      }
+    };
+
+    fetchDeliveryEstimate();
+  }, [selectedAddressId, shop]);
 
   const handlePlaceOrder = async () => {
     if (submitting) return;
+
+    if (shop && !isShopOpen(shop)) {
+      setError('This shop is currently closed. Orders cannot be placed at this time.');
+      return;
+    }
 
     if (!selectedAddressId) {
       setError('Please select or add a delivery address');
       return;
     }
 
+    if (estimateError) {
+      setError(estimateError);
+      return;
+    }
+
     if (!calculatedDistanceInfo) {
-      setError('Please enter delivery distance from shop and calculate delivery fee before placing order.');
+      setError('Please select a valid delivery address with location configured.');
       return;
     }
 
@@ -305,7 +348,6 @@ export default function CheckoutPage() {
         paymentMethod,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         notes,
-        deliveryDistance: calculatedDistanceInfo.distanceKm,
         idempotencyKey: orderKey,
         ...(buyNowItem
           ? {
@@ -337,38 +379,14 @@ export default function CheckoutPage() {
   };
 
 
-  let items = [];
-  let shop = null;
 
-  if (buyNowItem) {
-    const effectivePrice =
-      buyNowItem.product.discountPrice != null && buyNowItem.product.discountPrice < buyNowItem.product.price
-        ? buyNowItem.product.discountPrice
-        : buyNowItem.product.price;
-
-    items = [
-      {
-        product: buyNowItem.product,
-        quantity: buyNowItem.quantity,
-        price: effectivePrice,
-        shop: buyNowItem.shop,
-      },
-    ];
-    shop = buyNowItem.shop;
-  } else {
-    items = cart?.items || [];
-    shop = items.length > 0 ? items[0].shop : null;
-  }
 
   // const subtotal = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
   // const deliveryFee = shop?.deliveryFee !== undefined ? shop.deliveryFee : 0;
   // const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
   // const finalTotal = Math.max(0, subtotal + deliveryFee - discountAmount);
 
-  const subtotal = items.reduce(
-  (sum, item) => sum + (item.price || 0) * item.quantity,
-  0
-);
+
 
   const packingCharges = items.reduce(
     (sum, item) => sum + (Number(item.product?.packingCharges) || 0) * item.quantity,
@@ -559,7 +577,7 @@ export default function CheckoutPage() {
                               DEFAULT
                             </span>
                           )}
-                          {addr.hostelName && (
+                          {addr.label === 'HOSTEL' && addr.hostelName && !['SELECT HOSTEL', 'SELECT', 'N/A', 'NONE', 'CHOOSE HOSTEL'].includes(addr.hostelName.toUpperCase().trim()) && (
                             <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
                               {addr.hostelName} {addr.roomNumber ? `(Room ${addr.roomNumber})` : ''}
                             </span>
@@ -582,7 +600,7 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* 2. Delivery Distance Section */}
+          {/* 2. Automatic Delivery Distance Section */}
           <div style={{
             background: 'var(--surface)',
             borderRadius: '0.75rem',
@@ -590,75 +608,34 @@ export default function CheckoutPage() {
             padding: '1.5rem',
           }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Compass size={20} style={{ color: 'var(--primary)' }} /> 2. Delivery Distance
+              <Compass size={20} style={{ color: 'var(--primary)' }} /> 2. Delivery Distance & Fee
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              Enter distance from selected shop ({shop?.name || 'Shop'}) to calculate delivery fee.
+              Delivery distance and fee are calculated automatically based on shop and address locations.
             </p>
 
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-              <div style={{ position: 'relative', flex: '1', minWidth: '160px' }}>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  placeholder="e.g. 4.7"
-                  value={distanceInput}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDistanceInput(val);
-                    if (val === '') {
-                      setCalculatedDistanceInfo(null);
-                      setDistanceError('');
-                    } else if (!isNaN(Number(val)) && Number(val) >= 0) {
-                      handleCalculateDelivery(val);
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 2.5rem 0.65rem 0.85rem',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                  }}
-                />
-                <span style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '700' }}>
-                  km
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleCalculateDelivery()}
-                className="btn-primary"
-                style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem', whiteSpace: 'nowrap' }}
-              >
-                Calculate Delivery
-              </button>
-            </div>
-
-            {distanceError && (
-              <div style={{ color: 'var(--danger)', fontSize: '0.825rem', marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <AlertCircle size={14} />
-                <span>{distanceError}</span>
+            {estimatingDelivery && (
+              <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                Calculating delivery distance & fee...
               </div>
             )}
 
-            {calculatedDistanceInfo ? (
-              <div style={{ marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', color: '#166534', fontSize: '0.9rem' }}>
+            {estimateError && !estimatingDelivery && (
+              <div style={{ padding: '0.75rem 1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem', color: 'var(--danger)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={16} />
+                <span>{estimateError}</span>
+              </div>
+            )}
+
+            {calculatedDistanceInfo && !estimatingDelivery && (
+              <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', color: '#166534', fontSize: '0.9rem' }}>
                 <div style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <CheckCircle size={16} style={{ color: '#16a34a' }} /> Delivery distance calculated
+                  <CheckCircle size={16} style={{ color: '#16a34a' }} /> Distance calculated automatically
                 </div>
                 <div style={{ marginTop: '0.35rem', fontSize: '0.875rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                   <span>✓ Delivery distance: <strong>{calculatedDistanceInfo.distanceKm} km</strong></span>
                   <span>✓ Delivery fee: <strong>₹{calculatedDistanceInfo.deliveryFee}</strong></span>
                 </div>
-              </div>
-            ) : (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                Delivery Fee will be calculated based on distance slabs configured by {shop?.name || 'this shop'}.
               </div>
             )}
           </div>
@@ -1015,15 +992,21 @@ export default function CheckoutPage() {
               <div className="cpn-price-row">
                 <span className="cpn-price-label">Delivery Distance</span>
                 <span className="cpn-price-value">
-                  {calculatedDistanceInfo ? `${calculatedDistanceInfo.distanceKm} km` : 'Not entered'}
+                  {estimatingDelivery
+                    ? 'Calculating...'
+                    : calculatedDistanceInfo
+                      ? `${calculatedDistanceInfo.distanceKm} km`
+                      : (estimateError ? '—' : 'Select address')}
                 </span>
               </div>
               <div className="cpn-price-row">
                 <span className="cpn-price-label">Delivery Fee</span>
                 <span className="cpn-price-value" style={{ color: calculatedDistanceInfo ? 'inherit' : 'var(--text-muted)', fontStyle: calculatedDistanceInfo ? 'normal' : 'italic' }}>
-                  {calculatedDistanceInfo
-                    ? (deliveryFee > 0 ? `₹${deliveryFee.toFixed(2)}` : 'FREE')
-                    : 'Enter distance to calculate'}
+                  {estimatingDelivery
+                    ? 'Calculating...'
+                    : calculatedDistanceInfo
+                      ? (deliveryFee > 0 ? `₹${deliveryFee.toFixed(2)}` : 'FREE')
+                      : (estimateError ? '—' : 'Select address')}
                 </span>
               </div>
               <div className="cpn-price-row">
@@ -1122,38 +1105,62 @@ export default function CheckoutPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Address Type</label>
                 <select
-                  value={addressFormData.label}
-                  onChange={(e) => setAddressFormData({ ...addressFormData, label: e.target.value })}
+                  value={user?.customerType === 'ATITHI' ? 'HOME' : addressFormData.label}
+                  onChange={(e) => {
+                    const nextLabel = e.target.value;
+                    setAddressFormData((prev) => ({
+                      ...prev,
+                      label: nextLabel,
+                      // Clear hostel info if switching to HOME
+                      hostelName: nextLabel === 'HOME' ? '' : prev.hostelName,
+                      roomNumber: nextLabel === 'HOME' ? '' : prev.roomNumber,
+                    }));
+                  }}
+                  disabled={user?.customerType === 'ATITHI'}
                   style={{ width: '100%', padding: '0.6rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', borderRadius: '0.4rem' }}
                 >
-                  <option value="HOSTEL">Hostel</option>
-                  <option value="HOME">Home</option>
-                  <option value="OTHER">Other</option>
+                  {user?.customerType === 'ATITHI' ? (
+                    <option value="HOME">Home</option>
+                  ) : (
+                    <>
+                      <option value="HOSTEL">Hostel</option>
+                      <option value="HOME">Home</option>
+                      <option value="OTHER">Other</option>
+                    </>
+                  )}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Hostel Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Boys Hostel A"
-                    value={addressFormData.hostelName}
-                    onChange={(e) => setAddressFormData({ ...addressFormData, hostelName: e.target.value })}
-                    style={{ width: '100%', padding: '0.6rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', borderRadius: '0.4rem' }}
-                  />
+              {/* Render Hostel Selector only for STUDENT + Hostel address */}
+              {user?.customerType !== 'ATITHI' && addressFormData.label === 'HOSTEL' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Hostel Name</label>
+                    <select
+                      value={addressFormData.hostelName}
+                      onChange={(e) => setAddressFormData({ ...addressFormData, hostelName: e.target.value })}
+                      style={{ width: '100%', padding: '0.6rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', borderRadius: '0.4rem' }}
+                    >
+                      <option value="">Select Hostel</option>
+                      {hostelsList.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Room Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 302"
+                      value={addressFormData.roomNumber}
+                      onChange={(e) => setAddressFormData({ ...addressFormData, roomNumber: e.target.value })}
+                      style={{ width: '100%', padding: '0.6rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', borderRadius: '0.4rem' }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Room Number</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 302"
-                    value={addressFormData.roomNumber}
-                    onChange={(e) => setAddressFormData({ ...addressFormData, roomNumber: e.target.value })}
-                    style={{ width: '100%', padding: '0.6rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', borderRadius: '0.4rem' }}
-                  />
-                </div>
-              </div>
+              )}
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Full Address *</label>
@@ -1178,18 +1185,28 @@ export default function CheckoutPage() {
                 />
               </div>
 
-<<<<<<< HEAD
-=======
-              {/* GPS Location for accurate distance calculation */}
-              <div style={{ background: hasValidLocation ? '#ecfdf5' : '#fef2f2', border: `1px solid ${hasValidLocation ? '#a7f3d0' : '#fca5a5'}`, borderRadius: '0.5rem', padding: '0.85rem 1rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: '700', color: hasValidLocation ? '#065f46' : '#991b1b', marginBottom: '0.5rem' }}>
-                  <MapPin size={16} style={{ color: hasValidLocation ? '#059669' : '#dc2626' }} />
-                  {hasValidLocation ? '✅ Location Pinned Successfully' : '⚠️ Map Location Required'}
-                </label>
+              {/* Location Pin Section */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '0.75rem 0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span>Location</span>
+                    <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  {hasValidLocation ? (
+                    <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      ✓ Location pinned
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Pin required to save
+                    </span>
+                  )}
+                </div>
+
                 {hasValidLocation ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#047857', fontWeight: '600' }}>
-                      Lat: {Number(addressFormData.latitude).toFixed(5)}, Lng: {Number(addressFormData.longitude).toFixed(5)}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Coordinates: {Number(addressFormData.latitude).toFixed(4)}, {Number(addressFormData.longitude).toFixed(4)}
                     </span>
                     <button
                       type="button"
@@ -1201,15 +1218,15 @@ export default function CheckoutPage() {
                           { enableHighAccuracy: true, timeout: 10000 }
                         );
                       }}
-                      style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem', background: '#ffffff', border: '1px solid #10b981', borderRadius: '0.3rem', cursor: 'pointer', color: '#047857', fontWeight: '600' }}
+                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.3rem', cursor: 'pointer', color: 'var(--text-muted)' }}
                     >
-                      Update Pin
+                      Update
                     </button>
                   </div>
                 ) : (
                   <div>
-                    <p style={{ fontSize: '0.8rem', color: '#b91c1c', margin: '0 0 0.5rem 0', fontWeight: '500' }}>
-                      Pin your location on the map before saving the address.
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0' }}>
+                      Pin your location on the map to save this address.
                     </p>
                     <button
                       type="button"
@@ -1222,15 +1239,14 @@ export default function CheckoutPage() {
                         );
                       }}
                       className="btn-secondary"
-                      style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', border: '1px solid #dc2626', color: '#dc2626', fontWeight: '700' }}
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', fontWeight: '600' }}
                     >
-                      <Compass size={14} /> Pin My Location
+                      <Compass size={14} /> 📍 Pin My Location
                     </button>
                   </div>
                 )}
               </div>
 
->>>>>>> 84cc885 (Mendetory pin Address)
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowAddressModal(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
                   Cancel

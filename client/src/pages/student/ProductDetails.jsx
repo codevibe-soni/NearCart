@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProductById } from '../../services/studentService';
 import api from '../../services/api';
-import { LoadingSpinner } from '../../components/StudentUIComponents';
-import { ArrowLeft, ChevronLeft, ChevronRight, X, Maximize2, ShoppingCart, Zap, Plus, Minus, Star, MessageSquare, User } from 'lucide-react';
+import { LoadingSpinner, isShopOpen, formatTimeAMPM } from '../../components/StudentUIComponents';
+import { ArrowLeft, ChevronLeft, ChevronRight, X, Maximize2, ShoppingCart, Zap, Plus, Minus, Star, MessageSquare, User, AlertCircle } from 'lucide-react';
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -376,37 +376,65 @@ export default function ProductDetails() {
 
           {/* Associated Shop Card */}
           {product.shop && (
-            <div
-              style={{
-                background: '#f8fafc',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '1.25rem',
-                marginBottom: '2rem',
-                display: 'flex',
-                justify: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Sold & Fulfilled by</span>
-                <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{product.shop.name}</strong>
-                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  📍 {product.shop.address}
-                </span>
-              </div>
-              <button
-                onClick={() => navigate(`/student/shops/${product.shop._id}`)}
-                className="btn-secondary"
-                style={{ padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
+            <>
+              {/* Closed shop warning banner */}
+              {!isShopOpen(product.shop) && (
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                    border: '1px solid #fca5a5',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '1rem 1.25rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <AlertCircle size={20} style={{ color: '#dc2626', flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#991b1b', fontSize: '0.9rem' }}>Shop Closed</strong>
+                    <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.8rem', color: '#b91c1c' }}>
+                      You can browse products, but ordering is currently unavailable.
+                      {product.shop.openingTime && (
+                        <> Opens at <strong>{formatTimeAMPM(product.shop.openingTime)}</strong>.</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '1.25rem',
+                  marginBottom: '2rem',
+                  display: 'flex',
+                  justify: 'space-between',
+                  alignItems: 'center',
+                }}
               >
-                View Shop
-              </button>
-            </div>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Sold & Fulfilled by</span>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{product.shop.name}</strong>
+                  <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    📍 {product.shop.address}
+                  </span>
+                </div>
+                <button
+                  onClick={() => navigate(`/student/shops/${product.shop._id}`)}
+                  className="btn-secondary"
+                  style={{ padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
+                >
+                  View Shop
+                </button>
+              </div>
+            </>
           )}
 
           {/* Quantity Selector & Buy Now / Add to Cart Actions */}
-          {product.stock > 0 && (
+          {product.stock > 0 && isShopOpen(product.shop) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', marginTop: '1.5rem' }}>
               <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-primary)' }}>Quantity:</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', padding: '0.3rem 0.6rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
@@ -434,7 +462,7 @@ export default function ProductDetails() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
             <button
               onClick={() => handleAddToCart(false)}
-              disabled={addingToCart || product.stock <= 0}
+              disabled={addingToCart || product.stock <= 0 || !isShopOpen(product.shop)}
               className="btn-secondary"
               style={{
                 width: '100%',
@@ -442,16 +470,16 @@ export default function ProductDetails() {
                 fontSize: '0.95rem',
                 fontWeight: '700',
                 justifyContent: 'center',
-                opacity: addingToCart || product.stock <= 0 ? 0.6 : 1,
+                opacity: addingToCart || product.stock <= 0 || !isShopOpen(product.shop) ? 0.6 : 1,
               }}
             >
               <ShoppingCart size={18} />
-              {product.stock <= 0 ? 'Out of Stock' : addingToCart ? 'Adding...' : 'Add to Cart'}
+              {product.stock <= 0 ? 'Out of Stock' : !isShopOpen(product.shop) ? 'Shop Closed' : addingToCart ? 'Adding...' : 'Add to Cart'}
             </button>
 
             <button
               onClick={handleBuyNow}
-              disabled={product.stock <= 0}
+              disabled={product.stock <= 0 || !isShopOpen(product.shop)}
               className="btn-primary"
               style={{
                 width: '100%',
@@ -459,13 +487,13 @@ export default function ProductDetails() {
                 fontSize: '0.95rem',
                 fontWeight: '800',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                background: !isShopOpen(product.shop) ? '#94a3b8' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                 color: '#ffffff',
-                opacity: product.stock <= 0 ? 0.6 : 1,
+                opacity: product.stock <= 0 || !isShopOpen(product.shop) ? 0.6 : 1,
               }}
             >
               <Zap size={18} />
-              BUY NOW
+              {!isShopOpen(product.shop) ? 'Shop Closed' : 'BUY NOW'}
             </button>
           </div>
         </div>

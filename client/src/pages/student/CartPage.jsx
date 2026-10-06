@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, ArrowRight, Store, AlertCircle, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, ArrowRight, Store, AlertCircle, ShoppingBag, Clock, Lock } from 'lucide-react';
+import { isShopOpen, formatTimeAMPM } from '../../components/StudentUIComponents';
 
 export default function CartPage() {
   const [cart, setCart] = useState(null);
@@ -127,6 +128,8 @@ export default function CartPage() {
     );
   }
 
+  const shopClosed = shop && !isShopOpen(shop);
+
   return (
     <div className="container" style={{ padding: '2rem 1rem' }}>
       {/* Header */}
@@ -147,6 +150,32 @@ export default function CartPage() {
           <Trash2 size={16} /> Clear Cart
         </button>
       </div>
+
+      {shopClosed && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+          border: '1px solid #fca5a5',
+          borderRadius: '0.75rem',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          color: '#991b1b',
+        }}>
+          <Lock size={24} style={{ flexShrink: 0, color: '#dc2626' }} />
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>
+              {shop?.name || 'This shop'} is currently closed
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#b91c1c', marginTop: '0.2rem' }}>
+              {shop?.openingTime && shop?.closingTime
+                ? `Normal business hours: ${formatTimeAMPM(shop.openingTime)} – ${formatTimeAMPM(shop.closingTime)}. You can browse cart items, but checkout is disabled until the shop reopens.`
+                : 'You can view your items, but checkout is disabled until the shop reopens.'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{
@@ -332,7 +361,7 @@ export default function CartPage() {
 
             <button
               onClick={() => navigate('/checkout')}
-              disabled={shop?.minimumOrder > 0 && subtotal < shop.minimumOrder}
+              disabled={shopClosed || (shop?.minimumOrder > 0 && subtotal < shop.minimumOrder)}
               className="btn-primary"
               style={{
                 width: '100%',
@@ -341,9 +370,12 @@ export default function CartPage() {
                 fontWeight: '700',
                 marginTop: '1.5rem',
                 justifyContent: 'center',
+                opacity: shopClosed || (shop?.minimumOrder > 0 && subtotal < shop.minimumOrder) ? 0.6 : 1,
+                cursor: shopClosed ? 'not-allowed' : 'pointer',
+                background: shopClosed ? '#94a3b8' : undefined,
               }}
             >
-              Proceed to Checkout <ArrowRight size={18} />
+              {shopClosed ? 'Shop is Currently Closed' : <>Proceed to Checkout <ArrowRight size={18} /></>}
             </button>
           </div>
         </div>

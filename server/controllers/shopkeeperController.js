@@ -4,7 +4,7 @@ import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import Notification from '../models/Notification.js';
 import Coupon from '../models/Coupon.js';
-import { validateDeliveryChargeSlabs } from '../utils/distanceCalculator.js';
+import { validateDeliveryChargeSlabs, validateCoordinates } from '../utils/distanceCalculator.js';
 import { uploadBase64Image, generateCloudinarySignature } from '../services/cloudinaryService.js';
 import { assertNoBase64Image } from '../utils/imageGuard.js';
 
@@ -484,15 +484,20 @@ export const updateShop = async (req, res, next) => {
 
     assertNoBase64Image({ logo: shop.logo, coverImage: shop.coverImage, upiQrImage: shop.upiQrImage }, 'Shop update images');
 
-    if (location && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+    let shopLat = latitude !== undefined ? latitude : (location?.coordinates?.[1] !== undefined ? location.coordinates[1] : null);
+    let shopLng = longitude !== undefined ? longitude : (location?.coordinates?.[0] !== undefined ? location.coordinates[0] : null);
+
+    if (shopLat !== null && shopLng !== null && shopLat !== '' && shopLng !== '') {
+      const coordErr = validateCoordinates(shopLat, shopLng);
+      if (coordErr) {
+        return res.status(400).json({
+          success: false,
+          message: coordErr,
+        });
+      }
       shop.location = {
         type: 'Point',
-        coordinates: [Number(location.coordinates[0]), Number(location.coordinates[1])],
-      };
-    } else if (latitude !== undefined && longitude !== undefined) {
-      shop.location = {
-        type: 'Point',
-        coordinates: [Number(longitude), Number(latitude)],
+        coordinates: [Number(shopLng), Number(shopLat)],
       };
     }
 

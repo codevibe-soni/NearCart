@@ -131,6 +131,48 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Customer Type Section (Student / Atithi) */}
+        {user?.role === 'STUDENT' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ background: '#e0f2fe', padding: '0.75rem', borderRadius: '0.5rem', color: '#0284c7' }}>
+                <User size={24} />
+              </div>
+              <div>
+                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 0.25rem 0' }}>Customer Category</p>
+                <p style={{ fontSize: '1rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                  {user?.customerType === 'ATITHI' ? 'Atithi (Guest / Visitor)' : 'Student (Hostel / Campus)'}
+                </p>
+              </div>
+            </div>
+            <select
+              value={user?.customerType || 'STUDENT'}
+              onChange={async (e) => {
+                const nextType = e.target.value;
+                try {
+                  await api.put('/auth/profile', { customerType: nextType });
+                  await refreshUser();
+                } catch (err) {
+                  console.error('Failed to update customer type:', err);
+                }
+              }}
+              style={{
+                padding: '0.4rem 0.75rem',
+                borderRadius: '0.375rem',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                background: '#ffffff',
+                color: '#0284c7',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="STUDENT">Student</option>
+              <option value="ATITHI">Atithi</option>
+            </select>
+          </div>
+        )}
+
         {/* Phone Number Item with Edit/Add capability */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

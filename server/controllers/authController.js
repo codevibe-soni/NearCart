@@ -31,6 +31,7 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    customerType: user.customerType || 'STUDENT',
     accountStatus: user.accountStatus,
     profileImage: user.profileImage,
     authProvider: user.authProvider || 'local',
@@ -54,7 +55,7 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
 // @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, customerType } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({
@@ -88,13 +89,16 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // Public registration ALWAYS forces STUDENT role
+    const selectedCustomerType = ['STUDENT', 'ATITHI'].includes(customerType?.toUpperCase()) ? customerType.toUpperCase() : 'STUDENT';
+
+    // Public registration ALWAYS forces STUDENT role, but preserves customerType (STUDENT / ATITHI)
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       phone: phone.trim(),
       password,
       role: 'STUDENT',
+      customerType: selectedCustomerType,
       accountStatus: 'APPROVED',
     });
 
@@ -399,6 +403,7 @@ export const getMe = async (req, res, next) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        customerType: user.customerType || 'STUDENT',
         accountStatus: user.accountStatus,
         profileImage: user.profileImage,
         authProvider: user.authProvider || 'local',
@@ -476,7 +481,7 @@ export const setPassword = async (req, res, next) => {
 // @access  Private
 export const updateProfile = async (req, res, next) => {
   try {
-    const { name, phone, profileImage } = req.body;
+    const { name, phone, profileImage, customerType } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -490,6 +495,9 @@ export const updateProfile = async (req, res, next) => {
     if (phone) user.phone = phone.trim();
     if (profileImage !== undefined) user.profileImage = profileImage;
     if (req.body.isOnline !== undefined) user.isOnline = Boolean(req.body.isOnline);
+    if (customerType && ['STUDENT', 'ATITHI'].includes(customerType.toUpperCase())) {
+      user.customerType = customerType.toUpperCase();
+    }
 
     await user.save();
 
@@ -502,6 +510,7 @@ export const updateProfile = async (req, res, next) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        customerType: user.customerType || 'STUDENT',
         accountStatus: user.accountStatus,
         profileImage: user.profileImage,
         isActive: user.isActive,

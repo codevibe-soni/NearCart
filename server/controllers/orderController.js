@@ -25,49 +25,6 @@ const generateOrderNumber = () => {
 };
 
 /**
- * Helper to check if a shop is closed due to its closing schedule (weekly days / special dates).
- * Returns a reason string if closed, or null if open by schedule.
- */
-const isShopClosedBySchedule = (shop) => {
-  // Use IST (Asia/Kolkata = UTC+5:30) to derive the correct local date.
-  // Servers typically run in UTC; without this, the schedule check can be
-  // wrong by up to 5h30m, causing the shop to appear closed a day early/late.
-  const TZ = 'Asia/Kolkata';
-  const now = new Date();
-
-  // Build YYYY-MM-DD string in local (IST) timezone
-  const localDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now); // returns "YYYY-MM-DD" (en-CA uses ISO format)
-
-  // Get weekday name in IST
-  const localDayName = new Intl.DateTimeFormat('en-US', {
-    timeZone: TZ,
-    weekday: 'long',
-  }).format(now); // returns e.g. "Monday"
-
-  // Check special closing dates first (YYYY-MM-DD)
-  if (Array.isArray(shop.specialClosingDates) && shop.specialClosingDates.length > 0) {
-    const special = shop.specialClosingDates.find((s) => s.date === localDate);
-    if (special) {
-      return special.reason ? `Shop is closed today: ${special.reason}` : 'Shop is closed today (special holiday)';
-    }
-  }
-
-  // Check weekly closing days
-  if (Array.isArray(shop.weeklyClosingDays) && shop.weeklyClosingDays.length > 0) {
-    if (shop.weeklyClosingDays.includes(localDayName)) {
-      return `Shop is closed every ${localDayName}`;
-    }
-  }
-
-  return null;
-};
-
-/**
  * @desc    Validate and apply a coupon
  * @route   POST /api/orders/apply-coupon
  * @access  Private (Student)
@@ -278,10 +235,13 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Check shop closing schedule
-      const scheduleCloseReason = isShopClosedBySchedule(shop);
-      if (scheduleCloseReason) {
-        return res.status(400).json({ success: false, message: scheduleCloseReason });
+      // Closed shop protection — final security boundary
+      if (!shop.isOpen) {
+        return res.status(403).json({
+          success: false,
+          shopClosed: true,
+          message: `Cannot place order because ${shop.name} is currently closed.`,
+        });
       }
 
       // Calculate server-side effective selling price
@@ -333,10 +293,13 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Check shop closing schedule
-      const scheduleCloseReason = isShopClosedBySchedule(shop);
-      if (scheduleCloseReason) {
-        return res.status(400).json({ success: false, message: scheduleCloseReason });
+      // Closed shop protection — final security boundary for cart-based orders
+      if (!shop.isOpen) {
+        return res.status(403).json({
+          success: false,
+          shopClosed: true,
+          message: `Cannot place order because ${shop.name} is currently closed.`,
+        });
       }
 
       for (const item of cart.items) {
@@ -398,8 +361,8 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 5. Calculate delivery fee server-side using customer-entered distance (or fallback)
-    const deliveryCalc = calculateDeliveryFeeForShopAndAddress(shop, address, reqDeliveryDistance);
+    // 5. Calculate delivery fee server-side authoritatively from shop and customer address coordinates
+    const deliveryCalc = calculateDeliveryFeeForShopAndAddress(shop, address);
     if (!deliveryCalc.success) {
       return res.status(400).json({
         success: false,
@@ -1100,6 +1063,55 @@ export const cancelOrder = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to cancel order',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Get estimated delivery distance and fee before order creation
+ * @route   POST /api/orders/delivery-estimate
+ * @access  Private (Student)
+ */
+export const estimateDeliveryFee = async (req, res) => {
+  try {
+    const { shopId, addressId } = req.body;
+
+    if (!shopId) {
+      return res.status(400).json({ success: false, message: 'Shop ID is required' });
+    }
+    if (!addressId) {
+      return res.status(400).json({ success: false, message: 'Address ID is required' });
+    }
+
+    const address = await Address.findOne({ _id: addressId, user: req.user._id });
+    if (!address) {
+      return res.status(404).json({ success: false, message: 'Delivery address not found' });
+    }
+
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+
+    const deliveryCalc = calculateDeliveryFeeForShopAndAddress(shop, address);
+    if (!deliveryCalc.success) {
+      return res.status(400).json({
+        success: false,
+        message: deliveryCalc.error,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      distanceKm: deliveryCalc.distanceKm,
+      deliveryFee: deliveryCalc.deliveryFee,
+    });
+  } catch (error) {
+    console.error('Error estimating delivery fee:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to calculate delivery fee estimate',
       error: error.message,
     });
   }

@@ -130,12 +130,12 @@ export default function Student() {
                 fontWeight: '800',
               }}
             >
-              STUDENT MARKETPLACE
+              STUDENT / ATITHI MARKETPLACE
             </span>
           </div>
 
           <h1 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-            Welcome back, {user?.name ? user.name.split(' ')[0] : 'Student'}! 👋
+            Welcome back, {user?.name ? user.name.split(' ')[0] : (user?.customerType === 'ATITHI' ? 'Atithi Guest' : 'Student')}! 👋
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
             Select a nearby shop or hotel to browse its products and menu.

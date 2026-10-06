@@ -142,11 +142,21 @@ async function runTests() {
   const invalidErr = validateDeliveryChargeSlabs(invalidOverlappingSlabs);
   assert(invalidErr !== null && invalidErr.includes('Overlapping'), `Backend rejected overlapping slabs with: "${invalidErr}"`);
 
-  // TEST 17: Shop without GPS coordinates -> Order calculation STILL works!
-  console.log('TEST 17: Shop without GPS coordinates');
-  const shopNoGps = { location: { coordinates: [0, 0] }, deliveryChargeSlabs: testSlabs };
-  const noGpsCalc = calculateDeliveryFeeForShopAndAddress(shopNoGps, {}, 4.7);
-  assert(noGpsCalc.success && noGpsCalc.deliveryFee === 30, `Calculated fee ₹${noGpsCalc.deliveryFee} without requiring shop GPS coordinates`);
+  // TEST 17: Automatic GeoJSON Distance Calculation between Point A (Shop) and Point B (Address)
+  console.log('TEST 17: Automatic GeoJSON Distance Calculation (Kanpur coordinates)');
+  const shopKanpur = { location: { type: 'Point', coordinates: [80.3319, 26.4499] }, deliveryChargeSlabs: testSlabs };
+  const addressKanpur = { location: { type: 'Point', coordinates: [80.3490, 26.4650] } };
+  const kanpurCalc = calculateDeliveryFeeForShopAndAddress(shopKanpur, addressKanpur);
+  assert(
+    kanpurCalc.success && kanpurCalc.distanceKm === 2.39 && kanpurCalc.deliveryFee === 20,
+    `Calculated distance ${kanpurCalc.distanceKm} km (~2.39 km) and fee ₹${kanpurCalc.deliveryFee} (expected ₹20)`
+  );
+
+  // TEST 18: Missing or zero GPS coordinates validation
+  console.log('TEST 18: Rejects calculation when coordinates are missing or zero [0,0]');
+  const shopZeroGps = { location: { type: 'Point', coordinates: [0, 0] }, deliveryChargeSlabs: testSlabs };
+  const noGpsCalc = calculateDeliveryFeeForShopAndAddress(shopZeroGps, addressKanpur);
+  assert(!noGpsCalc.success && noGpsCalc.error.includes('Location is not configured'), `Rejects zero coordinates cleanly`);
 
   console.log(`\nResults: ${passedCount} PASSED, ${failedCount} FAILED`);
   if (failedCount > 0) {

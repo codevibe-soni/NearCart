@@ -57,7 +57,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
-  'https://nearcart.pages.dev',
+  'https://near-cart.pages.dev/',
   process.env.CLIENT_URL,
 ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
 

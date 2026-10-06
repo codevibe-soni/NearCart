@@ -107,6 +107,66 @@ export function getFeeForDistance(slabs, distanceKm, defaultFee = 0) {
  * @param {number|string} distanceInput - Distance in kilometers supplied by customer
  * @returns {Object} Result { success, distanceKm, deliveryFee, error }
  */
+/**
+ * Validates latitude and longitude values
+ * @param {number|string} lat - Latitude (-90 to 90)
+ * @param {number|string} lng - Longitude (-180 to 180)
+ * @returns {string|null} Null if valid, error message if invalid
+ */
+export function validateCoordinates(latInput, lngInput) {
+  if (latInput === undefined || latInput === null || latInput === '' || lngInput === undefined || lngInput === null || lngInput === '') {
+    return 'Latitude and longitude are required.';
+  }
+
+  const lat = Number(latInput);
+  const lng = Number(lngInput);
+
+  if (isNaN(lat) || !isFinite(lat)) {
+    return 'Latitude must be a valid number.';
+  }
+
+  if (isNaN(lng) || !isFinite(lng)) {
+    return 'Longitude must be a valid number.';
+  }
+
+  if (lat < -90 || lat > 90) {
+    return 'Latitude must be between -90 and 90 degrees.';
+  }
+
+  if (lng < -180 || lng > 180) {
+    return 'Longitude must be between -180 and 180 degrees.';
+  }
+
+  if (lat === 0 && lng === 0) {
+    return 'Please select a valid delivery location.';
+  }
+
+  return null;
+}
+
+/**
+ * Checks if a coordinate pair [longitude, latitude] is valid and non-zero
+ * @param {Array} coords - GeoJSON coordinates array [longitude, latitude]
+ * @returns {boolean} True if valid
+ */
+export function isValidCoordinatePair(coords) {
+  if (!coords || !Array.isArray(coords) || coords.length < 2) return false;
+  const lng = Number(coords[0]);
+  const lat = Number(coords[1]);
+
+  if (isNaN(lat) || !isFinite(lat) || lat < -90 || lat > 90) return false;
+  if (isNaN(lng) || !isFinite(lng) || lng < -180 || lng > 180) return false;
+  if (lat === 0 && lng === 0) return false;
+
+  return true;
+}
+
+/**
+ * Calculates delivery distance and fee from manual distance input supplied by customer
+ * @param {Object} shop - Shop document containing deliveryChargeSlabs and deliveryFee
+ * @param {number|string} distanceInput - Distance in kilometers supplied by customer
+ * @returns {Object} Result { success, distanceKm, deliveryFee, error }
+ */
 export function calculateDeliveryFeeFromDistance(shop, distanceInput) {
   if (distanceInput === undefined || distanceInput === null || distanceInput === '') {
     return { success: false, error: 'Please enter a valid delivery distance.' };
@@ -134,55 +194,47 @@ export function calculateDeliveryFeeFromDistance(shop, distanceInput) {
 }
 
 /**
- * Legacy wrapper for distance fee calculation that defaults to manual distance if provided
- * @param {Object} shop - Shop document/object containing location and deliveryChargeSlabs
- * @param {Object} address - Address document/object containing location coordinates
- * @param {number|string} [manualDistance] - Optional manual distance in km
+ * Authoritatively calculates delivery distance and fee for a given shop and address
+ * @param {Object} shop - Shop document containing location coordinates and deliveryChargeSlabs
+ * @param {Object} address - Address document containing location coordinates
+ * @param {number|string} [manualDistance] - Deprecated optional manual distance in km
  * @returns {Object} Result { success, distanceKm, deliveryFee, error }
  */
 export function calculateDeliveryFeeForShopAndAddress(shop, address, manualDistance) {
-  if (manualDistance !== undefined && manualDistance !== null && manualDistance !== '') {
-    return calculateDeliveryFeeFromDistance(shop, manualDistance);
-  }
-
   if (!shop) {
     return { success: false, error: 'Shop is required to calculate delivery charge' };
   }
 
-  // Extract shop coordinates [longitude, latitude]
+  if (!address) {
+    return { success: false, error: 'Delivery address is required' };
+  }
+
+  // Extract GeoJSON coordinates [longitude, latitude]
   const shopCoords = shop.location?.coordinates;
   const addressCoords = address?.location?.coordinates;
 
-  const hasShopCoords =
-    shopCoords &&
-    Array.isArray(shopCoords) &&
-    shopCoords.length >= 2 &&
-    !(shopCoords[0] === 0 && shopCoords[1] === 0) &&
-    !isNaN(Number(shopCoords[0])) &&
-    !isNaN(Number(shopCoords[1]));
+  const hasShopCoords = isValidCoordinatePair(shopCoords);
+  const hasAddrCoords = isValidCoordinatePair(addressCoords);
 
-  const hasAddrCoords =
-    addressCoords &&
-    Array.isArray(addressCoords) &&
-    addressCoords.length >= 2 &&
-    !(addressCoords[0] === 0 && addressCoords[1] === 0) &&
-    !isNaN(Number(addressCoords[0])) &&
-    !isNaN(Number(addressCoords[1]));
-
-  if (hasShopCoords && hasAddrCoords) {
-    const distanceKm = calculateHaversineDistanceKm(
-      Number(shopCoords[1]),
-      Number(shopCoords[0]),
-      Number(addressCoords[1]),
-      Number(addressCoords[0])
-    );
-    const fallbackFee = shop.deliveryFee !== undefined ? Number(shop.deliveryFee) : 0;
-    const deliveryFee = getFeeForDistance(shop.deliveryChargeSlabs, distanceKm, fallbackFee);
-    return { success: true, distanceKm, deliveryFee };
+  if (!hasShopCoords) {
+    return { success: false, error: 'Location is not configured for this shop.' };
   }
 
-  // Fallback: If no distance input or GPS coordinates are provided, delivery fee is 0
-  return { success: true, distanceKm: 0, deliveryFee: 0 };
+  if (!hasAddrCoords) {
+    return { success: false, error: 'Location is not configured for this address.' };
+  }
+
+  // GeoJSON array: index 0 = longitude, index 1 = latitude
+  const shopLng = Number(shopCoords[0]);
+  const shopLat = Number(shopCoords[1]);
+  const addrLng = Number(addressCoords[0]);
+  const addrLat = Number(addressCoords[1]);
+
+  const distanceKm = calculateHaversineDistanceKm(shopLat, shopLng, addrLat, addrLng);
+  const fallbackFee = shop.deliveryFee !== undefined ? Number(shop.deliveryFee) : 0;
+  const deliveryFee = getFeeForDistance(shop.deliveryChargeSlabs, distanceKm, fallbackFee);
+
+  return { success: true, distanceKm, deliveryFee };
 }
 export function validateCoordinates(lat, lng) {
   const latitude = Number(lat);

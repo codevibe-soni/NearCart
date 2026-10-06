@@ -237,7 +237,7 @@ export default function Home() {
               <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
                 <ShoppingBag style={{ color: 'var(--primary)' }} size={22} />
               </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '0.4rem' }}>Student / Customer</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '0.4rem' }}>Student / Atithi</h3>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
                 Order snacks, grocery items, stationery, and daily essentials straight to your hostel or location.
               </p>

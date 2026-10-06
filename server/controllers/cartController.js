@@ -16,7 +16,7 @@ export const getCart = async (req, res) => {
       })
       .populate({
         path: 'items.shop',
-        select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage'
+        select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage'
       });
 
     if (!cart) {
@@ -118,6 +118,15 @@ export const addToCart = async (req, res) => {
       });
     }
 
+    // Check if shop is currently open (isOpen is the authoritative source of truth)
+    if (!product.shop.isOpen) {
+      return res.status(403).json({
+        success: false,
+        shopClosed: true,
+        message: 'Shop is currently closed. You can browse products, but ordering is unavailable.',
+      });
+    }
+
     // Calculate effective selling price
     const effectivePrice =
       product.discountPrice != null && product.discountPrice < product.price
@@ -177,7 +186,7 @@ export const addToCart = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
     ]);
 
     return res.status(200).json({
@@ -237,11 +246,21 @@ export const updateCartItem = async (req, res) => {
       cart.items.splice(itemIndex, 1);
     } else {
       // Check stock availability
-      const product = await Product.findById(productId);
+      const product = await Product.findById(productId).populate('shop', 'isOpen isApproved isActive name');
       if (!product || !product.isAvailable) {
         return res.status(400).json({
           success: false,
           message: 'Product is no longer available',
+        });
+      }
+
+      // Re-check shop open status when increasing quantity
+      const isIncrease = qty > cart.items[itemIndex].quantity;
+      if (isIncrease && (!product.shop || !product.shop.isOpen)) {
+        return res.status(403).json({
+          success: false,
+          shopClosed: true,
+          message: 'Shop is currently closed. Increasing item quantity is unavailable.',
         });
       }
 
@@ -265,7 +284,7 @@ export const updateCartItem = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
     ]);
 
     return res.status(200).json({
@@ -308,7 +327,7 @@ export const removeCartItem = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
     ]);
 
     return res.status(200).json({

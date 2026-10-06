@@ -107,7 +107,6 @@ const orderSchema = new mongoose.Schema(
     idempotencyKey: {
       type: String,
       trim: true,
-      default: null,
     },
     totalAmount: {
       type: Number,

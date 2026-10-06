@@ -1,0 +1,10 @@
+import axios from 'axios';
+const r = await axios.post('http://localhost:5000/api/auth/login', { email: 'student@campuscart.com', password: 'Password123!' });
+const cookie = r.headers['set-cookie'][0];
+const shops = await axios.get('http://localhost:5000/api/shops', { headers: { Cookie: cookie } });
+const shop = shops.data.shops[0];
+console.log('Shop ID:', shop._id);
+const products = await axios.get('http://localhost:5000/api/products?shop=' + shop._id, { headers: { Cookie: cookie } });
+console.log('Products keys:', JSON.stringify(Object.keys(products.data)));
+console.log('data count:', products.data.data?.length);
+console.log('products count:', products.data.products?.length);

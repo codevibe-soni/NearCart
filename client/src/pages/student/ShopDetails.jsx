@@ -281,7 +281,36 @@ export default function ShopDetails() {
         </div>
       </div>
 
-      {/* Shop-Scoped Categories Horizontal Selector */}
+      {/* Closed Shop Browsing Banner */}
+      {!currentlyOpen && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            border: '1px solid #fca5a5',
+            borderRadius: '0.75rem',
+            padding: '1.25rem 1.5rem',
+            marginBottom: '2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+          }}
+        >
+          <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(220, 38, 38, 0.15)' }}>
+            <span style={{ fontSize: '1.2rem' }}>🔴</span>
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: '#991b1b' }}>
+              {shop.name} is Currently Closed
+            </h4>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: '#b91c1c' }}>
+              You can browse products, but ordering is currently unavailable.
+              {hasTiming && openTimeFormatted && (
+                <> Opens at <strong>{openTimeFormatted}</strong>.</>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
       {categories.length > 0 && (
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>

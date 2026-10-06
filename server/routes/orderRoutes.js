@@ -6,6 +6,7 @@ import {
   getOrderById,
   applyCoupon,
   cancelOrder,
+  estimateDeliveryFee,
 } from '../controllers/orderController.js';
 import {
   getOrderPaymentQr,
@@ -17,6 +18,7 @@ const router = express.Router();
 router.use(protect);
 
 // Student endpoints
+router.post('/delivery-estimate', authorizeRoles('STUDENT'), estimateDeliveryFee);
 router.post('/apply-coupon', authorizeRoles('STUDENT'), applyCoupon);
 router.post('/', authorizeRoles('STUDENT'), createOrder);
 router.get('/', authorizeRoles('STUDENT'), getStudentOrders);

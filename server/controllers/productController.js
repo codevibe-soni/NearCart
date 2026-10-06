@@ -142,7 +142,7 @@ export const getProductById = async (req, res, next) => {
     })
       .populate({
         path: 'shop',
-        select: 'name description logo rating totalRatings address phone isOpen isApproved isActive deliveryFee deliveryChargeSlabs upiEnabled upiId upiQrImage',
+        select: 'name description logo rating totalRatings address phone isOpen openingTime closingTime isApproved isActive deliveryFee deliveryChargeSlabs upiEnabled upiId upiQrImage',
         match: { isApproved: true, isActive: true },
       })
       .populate('category', 'name image');

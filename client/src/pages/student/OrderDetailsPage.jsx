@@ -580,7 +580,7 @@ export default function OrderDetailsPage() {
               <MapPin size={16} style={{ color: 'var(--primary)' }} /> Delivery Address
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-              {address.hostelName ? `${address.hostelName} (Room ${address.roomNumber})` : ''}
+              {address.label === 'HOSTEL' && address.hostelName && !['SELECT HOSTEL', 'SELECT', 'N/A', 'NONE', 'CHOOSE HOSTEL'].includes(address.hostelName.toUpperCase().trim()) ? `${address.hostelName}${address.roomNumber ? ` (Room ${address.roomNumber})` : ''}` : ''}
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
               {address.fullAddress}

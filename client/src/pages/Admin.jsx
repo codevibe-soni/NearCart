@@ -451,7 +451,7 @@ export default function Admin() {
                   className={userRoleFilter === role ? 'btn-primary' : 'btn-secondary'}
                   style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
                 >
-                  {role}
+                  {role === 'STUDENT' ? 'Student / Atithi' : role}
                 </button>
               ))}
             </div>
@@ -468,7 +468,7 @@ export default function Admin() {
                   <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>User</th>
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Contact Email & Phone</th>
-                    <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Role</th>
+                    <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Role / Type</th>
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Account Status</th>
                     <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Access State</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
@@ -484,9 +484,9 @@ export default function Admin() {
                         {u.email}<br />
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{u.phone}</span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', minWidth: '140px' }}>
+                      <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', minWidth: '160px' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '0.25rem 0.6rem', borderRadius: '0.25rem', background: 'rgba(56, 189, 248, 0.15)', color: 'var(--primary)', whiteSpace: 'nowrap', display: 'inline-block' }}>
-                          {u.role}
+                          {u.role === 'STUDENT' ? `Student / Atithi (${u.customerType || 'STUDENT'})` : u.role}
                         </span>
                       </td>
                       <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>{u.accountStatus || 'APPROVED'}</td>

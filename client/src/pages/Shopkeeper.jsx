@@ -25,8 +25,8 @@ import {
   X,
   Star,
   Tag,
-  Calendar,
-  CalendarX,
+  MapPin,
+  Navigation,
 } from 'lucide-react';
 import CouponManagement from '../components/CouponManagement';
 
@@ -69,12 +69,38 @@ export default function Shopkeeper() {
     logo: '',
     coverImage: '',
     isOpen: true,
-    weeklyClosingDays: [],
-    specialClosingDates: [],
+    latitude: '',
+    longitude: '',
   });
 
+  // Shop Location Detection State
+  const [shopLocDetecting, setShopLocDetecting] = useState(false);
+  const [shopLocMsg, setShopLocMsg] = useState('');
+
+  const handleDetectShopLocation = () => {
+    if (!navigator.geolocation) {
+      setShopLocMsg('Geolocation is not supported by your browser.');
+      return;
+    }
+    setShopLocDetecting(true);
+    setShopLocMsg('');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(7));
+        const lng = parseFloat(pos.coords.longitude.toFixed(7));
+        setShopForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+        setShopLocMsg(`\u2705 Location captured: ${lat}, ${lng}`);
+        setShopLocDetecting(false);
+      },
+      (err) => {
+        setShopLocMsg('\u274c Failed to get location: ' + err.message);
+        setShopLocDetecting(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   const [newSlab, setNewSlab] = useState({ minDistanceKm: '', maxDistanceKm: '', charge: '' });
-  const [newSpecialDate, setNewSpecialDate] = useState({ date: '', reason: '' });
 
   const handleAddSlab = () => {
     const min = Number(newSlab.minDistanceKm);
@@ -197,9 +223,14 @@ export default function Shopkeeper() {
             upiEnabled: shopRes.shop.upiEnabled !== undefined ? shopRes.shop.upiEnabled : true,
             upiId: shopRes.shop.upiId || '',
             upiQrImage: shopRes.shop.upiQrImage || '',
-            weeklyClosingDays: shopRes.shop.weeklyClosingDays || [],
-            specialClosingDates: shopRes.shop.specialClosingDates || [],
+            latitude: shopRes.shop.location?.coordinates?.[1] || '',
+            longitude: shopRes.shop.location?.coordinates?.[0] || '',
           });
+          setShopLocMsg(
+            shopRes.shop.location?.coordinates?.[1]
+              ? `\u2705 Current location: ${shopRes.shop.location.coordinates[1]}, ${shopRes.shop.location.coordinates[0]}`
+              : ''
+          );
         } else {
           setShop(null);
         }
@@ -765,6 +796,33 @@ export default function Shopkeeper() {
             <div className="form-group">
               <label className="form-label">Campus Address</label>
               <input type="text" className="form-input" placeholder="e.g. SAC Building, Room 102" value={shopForm.address} onChange={(e) => setShopForm({ ...shopForm, address: e.target.value })} required />
+            </div>
+
+            {/* Shop GPS Location */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <MapPin size={15} /> Shop Location (GPS)
+              </label>
+              <button
+                type="button"
+                onClick={handleDetectShopLocation}
+                disabled={shopLocDetecting}
+                className="btn-secondary"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Navigation size={14} />
+                {shopLocDetecting ? 'Detecting...' : (shopForm.latitude ? 'Update Location' : 'Detect My Location')}
+              </button>
+              {shopLocMsg && (
+                <div style={{ marginTop: '0.4rem', fontSize: '0.82rem', color: shopLocMsg.startsWith('\u2705') ? '#059669' : '#dc2626' }}>
+                  {shopLocMsg}
+                </div>
+              )}
+              {shopForm.latitude && shopForm.longitude && (
+                <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Lat: {shopForm.latitude}, Lng: {shopForm.longitude}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -1566,6 +1624,33 @@ export default function Shopkeeper() {
 
                 <div className="form-group"><label className="form-label">Campus Address</label><input type="text" className="form-input" value={shopForm.address} onChange={(e) => setShopForm({ ...shopForm, address: e.target.value })} required /></div>
 
+                {/* Shop GPS Location */}
+                <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <MapPin size={15} /> Shop Location (GPS)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleDetectShopLocation}
+                    disabled={shopLocDetecting}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Navigation size={14} />
+                    {shopLocDetecting ? 'Detecting...' : (shopForm.latitude ? 'Update Location' : 'Detect My Location')}
+                  </button>
+                  {shopLocMsg && (
+                    <div style={{ marginTop: '0.4rem', fontSize: '0.82rem', color: shopLocMsg.startsWith('\u2705') ? '#059669' : '#dc2626' }}>
+                      {shopLocMsg}
+                    </div>
+                  )}
+                  {shopForm.latitude && shopForm.longitude && (
+                    <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Lat: {shopForm.latitude}, Lng: {shopForm.longitude}
+                    </div>
+                  )}
+                </div>
+
                 {/* Shop Timings */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
@@ -1666,172 +1751,7 @@ export default function Shopkeeper() {
                   </div>
                 </div>
 
-                {/* ── Closing Schedule Section ── */}
-                <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <CalendarX size={18} style={{ color: 'var(--danger, #ef4444)' }} />
-                    Closing Schedule
-                  </h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                    Set recurring weekly off-days and specific holiday dates. Customers will see "CLOSED" on these days even if the shop is enabled.
-                  </p>
-
-                  {/* Weekly Closing Days */}
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                      <Calendar size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                      Weekly Off-Days
-                    </label>
-                    <div className="closing-day-pills" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => {
-                        const isChecked = (shopForm.weeklyClosingDays || []).includes(day);
-                        return (
-                          <label
-                            key={day}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem',
-                              padding: '0.35rem 0.75rem',
-                              borderRadius: '9999px',
-                              border: `1px solid ${isChecked ? 'rgba(239,68,68,0.5)' : 'var(--border-color)'}`,
-                              background: isChecked ? 'rgba(239,68,68,0.08)' : 'transparent',
-                              cursor: 'pointer',
-                              fontSize: '0.82rem',
-                              fontWeight: isChecked ? '700' : '500',
-                              color: isChecked ? '#b91c1c' : 'var(--text-secondary)',
-                              transition: 'all 0.15s ease',
-                              userSelect: 'none',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              style={{ width: '14px', height: '14px', accentColor: '#ef4444', cursor: 'pointer' }}
-                              onChange={() => {
-                                const current = shopForm.weeklyClosingDays || [];
-                                const updated = isChecked
-                                  ? current.filter((d) => d !== day)
-                                  : [...current, day];
-                                setShopForm({ ...shopForm, weeklyClosingDays: updated });
-                              }}
-                            />
-                            {day.slice(0, 3)}
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {(shopForm.weeklyClosingDays || []).length > 0 && (
-                      <p style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '0.4rem' }}>
-                        🔴 Closed every: {shopForm.weeklyClosingDays.join(', ')}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Special Date Closures */}
-                  <div>
-                    <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                      <CalendarX size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                      Special Closing Dates
-                    </label>
-
-                    {/* Existing special dates list */}
-                    {(shopForm.specialClosingDates || []).length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
-                        {shopForm.specialClosingDates.map((entry, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '0.45rem 0.75rem', borderRadius: '0.5rem' }}>
-                            <div>
-                              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                {(() => {
-                                  // Format YYYY-MM-DD → "25 Dec 2026"
-                                  try {
-                                    const [y, m, d] = entry.date.split('-');
-                                    return new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-                                  } catch { return entry.date; }
-                                })()}
-                              </span>
-                              {entry.reason && (
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                                  — {entry.reason}
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = shopForm.specialClosingDates.filter((_, i) => i !== idx);
-                                setShopForm({ ...shopForm, specialClosingDates: updated });
-                              }}
-                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700', padding: '0.2rem 0.4rem' }}
-                              title="Remove this date"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                        No special closing dates added yet.
-                      </p>
-                    )}
-
-                    {/* Add new special date */}
-                    <div className="special-date-add-row" style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                      <div className="form-group" style={{ margin: 0, flex: '0 0 auto' }}>
-                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Date</label>
-                        <input
-                          type="date"
-                          className="form-input"
-                          style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', minWidth: '150px' }}
-                          value={newSpecialDate.date}
-                          min={new Intl.DateTimeFormat('en-CA').format(new Date())}
-                          onChange={(e) => setNewSpecialDate({ ...newSpecialDate, date: e.target.value })}
-                        />
-                      </div>
-                      <div className="form-group" style={{ margin: 0, flex: '1 1 140px' }}>
-                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Reason (optional)</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="e.g. Diwali, Maintenance..."
-                          style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem' }}
-                          value={newSpecialDate.reason}
-                          onChange={(e) => setNewSpecialDate({ ...newSpecialDate, reason: e.target.value })}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', flexShrink: 0, borderColor: 'rgba(239,68,68,0.4)', color: '#b91c1c' }}
-                        onClick={() => {
-                          if (!newSpecialDate.date) {
-                            alert('Please select a date.');
-                            return;
-                          }
-                          const exists = (shopForm.specialClosingDates || []).some((s) => s.date === newSpecialDate.date);
-                          if (exists) {
-                            alert('This date is already in the list.');
-                            return;
-                          }
-                          setShopForm({
-                            ...shopForm,
-                            specialClosingDates: [
-                              ...(shopForm.specialClosingDates || []),
-                              { date: newSpecialDate.date, reason: newSpecialDate.reason.trim() },
-                            ].sort((a, b) => a.date.localeCompare(b.date)),
-                          });
-                          setNewSpecialDate({ date: '', reason: '' });
-                        }}
-                      >
-                        <Plus size={15} /> Add Date
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '1.25rem' }}>Save Shop Settings</button>
-
+                <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '1.25rem' }}>Save Delivery Charges</button>
               </form>
             </div>
           )}
