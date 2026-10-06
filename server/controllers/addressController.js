@@ -1,4 +1,112 @@
 import Address from '../models/Address.js';
+<<<<<<< HEAD
+=======
+import { validateCoordinates, isValidCoordinatePair } from '../utils/distanceCalculator.js';
+
+const FORBIDDEN_PLACEHOLDERS = [
+  'SELECT HOSTEL',
+  'SELECT',
+  'CHOOSE HOSTEL',
+  'ENTER HOSTEL NAME',
+  'N/A',
+  'NA',
+  'NONE',
+  'NULL',
+  'UNDEFINED',
+  'TEST HOSTEL',
+  'HOME ADDRESS',
+  'YOUR HOSTEL',
+];
+
+const sanitizeHostelFields = (reqBody, userCustomerType) => {
+  const addressLabel = (reqBody.label || 'HOSTEL').toUpperCase();
+  const customerType = (userCustomerType || reqBody.customerType || 'STUDENT').toUpperCase();
+
+  let hostelName = reqBody.hostelName ? reqBody.hostelName.trim() : '';
+  let roomNumber = reqBody.roomNumber ? reqBody.roomNumber.trim() : '';
+
+  // ATITHI or HOME addresses MUST NOT contain any hostel info
+  if (customerType === 'ATITHI' || addressLabel === 'HOME') {
+    return { hostelName: '', roomNumber: '' };
+  }
+
+  // Sanitize / reject placeholder values
+  if (FORBIDDEN_PLACEHOLDERS.includes(hostelName.toUpperCase())) {
+    hostelName = '';
+    roomNumber = '';
+  }
+
+  return { hostelName, roomNumber };
+};
+
+/**
+ * Helper to extract and validate location coordinates from request body
+ */
+const extractAndValidateLocation = (reqBody, requireLocation = true) => {
+  let lat = reqBody.latitude !== undefined ? reqBody.latitude : (reqBody.lat !== undefined ? reqBody.lat : null);
+  let lng = reqBody.longitude !== undefined ? reqBody.longitude : (reqBody.lng !== undefined ? reqBody.lng : null);
+
+  if ((lat === null || lng === null) && reqBody.location && Array.isArray(reqBody.location.coordinates) && reqBody.location.coordinates.length >= 2) {
+    lng = reqBody.location.coordinates[0];
+    lat = reqBody.location.coordinates[1];
+  }
+
+  if (lat === null || lng === null || lat === '' || lng === '') {
+    if (requireLocation) {
+      return { location: null, error: 'Please pin your exact location on the map before saving the address.' };
+    }
+    return { location: null, error: null };
+  }
+
+  const error = validateCoordinates(lat, lng);
+  if (error) {
+    return { location: null, error };
+  }
+
+  return {
+    location: {
+      type: 'Point',
+      coordinates: [Number(lng), Number(lat)],
+    },
+    error: null,
+  };
+};
+
+/**
+ * @desc    Get available campus hostel names
+ * @route   GET /api/addresses/hostels
+ * @access  Private (Student)
+ */
+export const getHostels = async (req, res) => {
+  try {
+    const existingHostels = await Address.distinct('hostelName', {
+      hostelName: { $exists: true, $ne: '' },
+    });
+
+    const cleanHostels = Array.from(
+      new Set(
+        existingHostels
+          .map((h) => h && h.trim())
+          .filter((h) => h && !FORBIDDEN_PLACEHOLDERS.includes(h.toUpperCase()))
+      )
+    );
+
+    const defaultCampusHostels = ['Bhabha Hostel', 'Hostel 1', 'Hostel 5', 'Block A', 'Block B', 'Block C'];
+    const allHostels = Array.from(new Set([...cleanHostels, ...defaultCampusHostels]));
+
+    return res.status(200).json({
+      success: true,
+      data: allHostels,
+    });
+  } catch (error) {
+    console.error('Error fetching hostels:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hostels',
+    });
+  }
+};
+>>>>>>> 84cc885 (Mendetory pin Address)
 
 /**
  * @desc    Get all addresses for authenticated student
@@ -39,6 +147,19 @@ export const createAddress = async (req, res) => {
       });
     }
 
+<<<<<<< HEAD
+=======
+    const { location, error: locationError } = extractAndValidateLocation(req.body, true);
+    if (locationError || !location) {
+      return res.status(400).json({
+        success: false,
+        message: locationError || 'Please pin your exact location on the map before saving the address.',
+      });
+    }
+
+    const { hostelName, roomNumber } = sanitizeHostelFields(req.body, req.user?.customerType);
+
+>>>>>>> 84cc885 (Mendetory pin Address)
     // If setting as default, clear default status from other user addresses
     if (isDefault) {
       await Address.updateMany({ user: req.user._id }, { isDefault: false });
@@ -92,7 +213,28 @@ export const updateAddress = async (req, res) => {
       });
     }
 
+<<<<<<< HEAD
     const { label, hostelName, roomNumber, fullAddress, landmark, city, state, postalCode, isDefault } = req.body;
+=======
+    const { label, fullAddress, landmark, city, state, postalCode, isDefault } = req.body;
+
+    const { location, error: locationError } = extractAndValidateLocation(req.body, false);
+    if (locationError) {
+      return res.status(400).json({
+        success: false,
+        message: locationError,
+      });
+    }
+>>>>>>> 84cc885 (Mendetory pin Address)
+
+    if (location) {
+      address.location = location;
+    } else if (!isValidCoordinatePair(address.location?.coordinates)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please pin your exact location on the map before saving the address.',
+      });
+    }
 
     if (isDefault && !address.isDefault) {
       await Address.updateMany({ user: req.user._id }, { isDefault: false });

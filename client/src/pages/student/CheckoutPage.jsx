@@ -48,6 +48,54 @@ export default function CheckoutPage() {
 
   const navigate = useNavigate();
 
+<<<<<<< HEAD
+=======
+  const isValidLat = (val) => {
+    if (val === null || val === undefined || val === '') return false;
+    const num = Number(val);
+    return !isNaN(num) && isFinite(num) && num >= -90 && num <= 90;
+  };
+
+  const isValidLng = (val) => {
+    if (val === null || val === undefined || val === '') return false;
+    const num = Number(val);
+    return !isNaN(num) && isFinite(num) && num >= -180 && num <= 180;
+  };
+
+  const hasValidLocation =
+    isValidLat(addressFormData.latitude) &&
+    isValidLng(addressFormData.longitude) &&
+    !(Number(addressFormData.latitude) === 0 && Number(addressFormData.longitude) === 0);
+
+  let items = [];
+  let shop = null;
+
+  if (buyNowItem) {
+    const effectivePrice =
+      buyNowItem.product.discountPrice != null && buyNowItem.product.discountPrice < buyNowItem.product.price
+        ? buyNowItem.product.discountPrice
+        : buyNowItem.product.price;
+
+    items = [
+      {
+        product: buyNowItem.product,
+        quantity: buyNowItem.quantity,
+        price: effectivePrice,
+        shop: buyNowItem.shop,
+      },
+    ];
+    shop = buyNowItem.shop;
+  } else {
+    items = cart?.items || [];
+    shop = items.length > 0 ? items[0].shop : null;
+  }
+
+  const subtotal = items.reduce(
+    (sum, item) => sum + (item.price || 0) * item.quantity,
+    0
+  );
+
+>>>>>>> 84cc885 (Mendetory pin Address)
   const handleDetectLocality = async () => {
     setLocationDetecting(true);
     setLocationMessage('');
@@ -159,6 +207,11 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!addressFormData.fullAddress.trim()) {
       alert('Full address is required');
+      return;
+    }
+
+    if (!hasValidLocation) {
+      alert('Please pin your exact location on the map before saving the address.');
       return;
     }
 
@@ -1125,11 +1178,75 @@ export default function CheckoutPage() {
                 />
               </div>
 
+<<<<<<< HEAD
+=======
+              {/* GPS Location for accurate distance calculation */}
+              <div style={{ background: hasValidLocation ? '#ecfdf5' : '#fef2f2', border: `1px solid ${hasValidLocation ? '#a7f3d0' : '#fca5a5'}`, borderRadius: '0.5rem', padding: '0.85rem 1rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: '700', color: hasValidLocation ? '#065f46' : '#991b1b', marginBottom: '0.5rem' }}>
+                  <MapPin size={16} style={{ color: hasValidLocation ? '#059669' : '#dc2626' }} />
+                  {hasValidLocation ? '✅ Location Pinned Successfully' : '⚠️ Map Location Required'}
+                </label>
+                {hasValidLocation ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#047857', fontWeight: '600' }}>
+                      Lat: {Number(addressFormData.latitude).toFixed(5)}, Lng: {Number(addressFormData.longitude).toFixed(5)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+                        navigator.geolocation.getCurrentPosition(
+                          (p) => setAddressFormData((prev) => ({ ...prev, latitude: parseFloat(p.coords.latitude.toFixed(7)), longitude: parseFloat(p.coords.longitude.toFixed(7)) })),
+                          (err) => alert('Location error: ' + err.message),
+                          { enableHighAccuracy: true, timeout: 10000 }
+                        );
+                      }}
+                      style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem', background: '#ffffff', border: '1px solid #10b981', borderRadius: '0.3rem', cursor: 'pointer', color: '#047857', fontWeight: '600' }}
+                    >
+                      Update Pin
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ fontSize: '0.8rem', color: '#b91c1c', margin: '0 0 0.5rem 0', fontWeight: '500' }}>
+                      Pin your location on the map before saving the address.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+                        navigator.geolocation.getCurrentPosition(
+                          (p) => setAddressFormData((prev) => ({ ...prev, latitude: parseFloat(p.coords.latitude.toFixed(7)), longitude: parseFloat(p.coords.longitude.toFixed(7)) })),
+                          (err) => alert('Could not get location: ' + err.message),
+                          { enableHighAccuracy: true, timeout: 10000 }
+                        );
+                      }}
+                      className="btn-secondary"
+                      style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', border: '1px solid #dc2626', color: '#dc2626', fontWeight: '700' }}
+                    >
+                      <Compass size={14} /> Pin My Location
+                    </button>
+                  </div>
+                )}
+              </div>
+
+>>>>>>> 84cc885 (Mendetory pin Address)
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowAddressModal(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                <button
+                  type="submit"
+                  disabled={!hasValidLocation}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.5rem 1rem',
+                    opacity: !hasValidLocation ? 0.5 : 1,
+                    cursor: !hasValidLocation ? 'not-allowed' : 'pointer',
+                    background: !hasValidLocation ? '#94a3b8' : undefined,
+                  }}
+                  title={!hasValidLocation ? 'Please pin your location on the map first' : 'Save Address'}
+                >
                   Save Address
                 </button>
               </div>
