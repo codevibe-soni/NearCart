@@ -371,7 +371,7 @@ html {
    We add padding-bottom to the footer so it doesn't hide under the nav. */
 @media (max-width: 768px) {
   .main-footer {
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
