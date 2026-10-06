@@ -184,4 +184,45 @@ export function calculateDeliveryFeeForShopAndAddress(shop, address, manualDista
   // Fallback: If no distance input or GPS coordinates are provided, delivery fee is 0
   return { success: true, distanceKm: 0, deliveryFee: 0 };
 }
+export function validateCoordinates(lat, lng) {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
 
+  if (
+    !isFinite(latitude) ||
+    latitude < -90 ||
+    latitude > 90
+  ) {
+    return 'Invalid latitude. Latitude must be between -90 and 90.';
+  }
+
+  if (
+    !isFinite(longitude) ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return 'Invalid longitude. Longitude must be between -180 and 180.';
+  }
+
+  return null;
+}
+
+export function isValidCoordinatePair(coordinates) {
+  if (
+    !Array.isArray(coordinates) ||
+    coordinates.length < 2
+  ) {
+    return false;
+  }
+
+  const [lng, lat] = coordinates;
+
+  return (
+    isFinite(Number(lat)) &&
+    isFinite(Number(lng)) &&
+    Number(lat) >= -90 &&
+    Number(lat) <= 90 &&
+    Number(lng) >= -180 &&
+    Number(lng) <= 180
+  );
+} 
