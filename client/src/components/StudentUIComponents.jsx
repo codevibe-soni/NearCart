@@ -321,7 +321,7 @@ export function ShopCard({ shop, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="glass-card"
+      className={`glass-card shop-card ${!currentlyOpen ? 'shop-card-closed' : ''}`}
       style={{
         cursor: 'pointer',
         display: 'flex',
@@ -329,9 +329,6 @@ export function ShopCard({ shop, onClick }) {
         height: '100%',
         position: 'relative',
         transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-        background: !currentlyOpen ? 'linear-gradient(180deg, #ffffff 0%, #fef2f2 100%)' : '#ffffff',
-        border: !currentlyOpen ? '1px solid #fecaca' : '1px solid var(--border-color)',
-        opacity: !currentlyOpen ? 0.92 : 1,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.85rem' }}>
@@ -384,17 +381,7 @@ export function ShopCard({ shop, onClick }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem', flexShrink: 0 }}>
           <span
-            style={{
-              padding: '0.25rem 0.65rem',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: '800',
-              letterSpacing: '0.02em',
-              background: !currentlyOpen ? '#fee2e2' : !hasTiming ? '#f1f5f9' : '#d1fae5',
-              color: !currentlyOpen ? '#b91c1c' : !hasTiming ? '#64748b' : '#047857',
-              border: `1px solid ${!currentlyOpen ? '#fca5a5' : !hasTiming ? '#cbd5e1' : '#a7f3d0'}`,
-              whiteSpace: 'nowrap',
-            }}
+            className={`shop-status-badge ${!currentlyOpen ? 'shop-status-closed' : !hasTiming ? 'shop-status-no-hours' : 'shop-status-open'}`}
           >
             {!currentlyOpen ? 'CLOSED' : !hasTiming ? 'Hours not set' : 'OPEN'}
           </span>

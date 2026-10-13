@@ -22,35 +22,35 @@ export const SOCIAL_LINKS_CONFIG = [
   {
     id: 'instagram',
     name: 'Instagram',
-    url: import.meta.env.VITE_SOCIAL_INSTAGRAM || '',
+    url: import.meta.env.VITE_SOCIAL_INSTAGRAM || 'https://instagram.com/nearcart',
     icon: Instagram,
     ariaLabel: 'NearCart on Instagram',
   },
   {
     id: 'linkedin',
     name: 'LinkedIn',
-    url: import.meta.env.VITE_SOCIAL_LINKEDIN || '',
+    url: import.meta.env.VITE_SOCIAL_LINKEDIN || 'https://linkedin.com/company/nearcart',
     icon: Linkedin,
     ariaLabel: 'NearCart on LinkedIn',
   },
   {
     id: 'github',
     name: 'GitHub',
-    url: import.meta.env.VITE_SOCIAL_GITHUB || '',
+    url: import.meta.env.VITE_SOCIAL_GITHUB || 'https://github.com/nearcart',
     icon: Github,
     ariaLabel: 'NearCart on GitHub',
   },
   {
     id: 'youtube',
     name: 'YouTube',
-    url: import.meta.env.VITE_SOCIAL_YOUTUBE || '',
+    url: import.meta.env.VITE_SOCIAL_YOUTUBE || 'https://youtube.com/@nearcart',
     icon: Youtube,
     ariaLabel: 'NearCart on YouTube',
   },
   {
     id: 'twitter',
     name: 'X (Twitter)',
-    url: import.meta.env.VITE_SOCIAL_TWITTER || '',
+    url: import.meta.env.VITE_SOCIAL_TWITTER || 'https://x.com/nearcart',
     icon: Twitter,
     ariaLabel: 'NearCart on X (Twitter)',
   },
@@ -296,25 +296,38 @@ export default function Footer() {
           outline: none;
         }
         .social-icon-btn {
-          width: 1.75rem;
-          height: 1.75rem;
+          width: 1.85rem;
+          height: 1.85rem;
           border-radius: 50%;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(56, 189, 248, 0.2);
+          background: #000000 !important;
+          border: 1px solid rgba(255, 255, 255, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #e2e8f0;
-          text-decoration: none;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .social-icon-btn:hover, .social-icon-btn:focus-visible {
-          background: #0284c7 !important;
           color: #ffffff !important;
-          border-color: #38bdf8 !important;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
-          outline: none;
+          text-decoration: none;
+          transition: background-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .social-icon-btn:hover {
+          background: #0D6EFD !important;
+          color: #ffffff !important;
+          border-color: #0D6EFD !important;
+          transform: translateY(-2px) scale(1.08);
+          box-shadow: 0 4px 14px rgba(13, 110, 253, 0.45);
+        }
+        .social-icon-btn:active,
+        .social-icon-btn.active {
+          background: #0D6EFD !important;
+          color: #ffffff !important;
+          border-color: #0D6EFD !important;
+          transform: translateY(0) scale(1.02);
+          box-shadow: 0 2px 8px rgba(13, 110, 253, 0.35);
+        }
+        .social-icon-btn:focus-visible {
+          background: #0D6EFD !important;
+          color: #ffffff !important;
+          outline: 2px solid #0D6EFD;
+          outline-offset: 2px;
         }
         .footer-trust-box {
           background: rgba(56, 189, 248, 0.05);

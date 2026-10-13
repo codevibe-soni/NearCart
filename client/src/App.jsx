@@ -207,7 +207,7 @@ function App() {
       </Suspense>
     </GlobalRouteLoader>
   </BrowserRouter>
-);
+   </> );
 }
 
 export default App;

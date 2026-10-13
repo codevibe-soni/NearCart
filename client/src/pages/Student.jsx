@@ -11,6 +11,8 @@ import {
   ClosedShopModal,
 } from '../components/StudentUIComponents';
 import { Store, Compass, ArrowRight } from 'lucide-react';
+import heroPoster from '../assets/hero-poster.jpg';
+import './Student.css';
 
 export default function Student() {
   const { user } = useAuth();
@@ -120,43 +122,20 @@ export default function Student() {
   const categoryTitle = selectedCategoryObj ? selectedCategoryObj.name : 'Shops';
 
   return (
-    <div className="container" style={{ padding: '2rem 0.5rem 4rem 0.5rem' }}>
-      {/* Welcome Banner */}
-      <div
-        className="glass-card"
-        style={{
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          padding: '2rem 1.5rem',
-          marginBottom: '2rem',
-          position: 'relative',
-          overflow: 'hidden',
-          border: '1px solid var(--border-color)',
-        }}
-      >
-        <div style={{ maxWidth: '650px', position: 'relative', zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            
-            <span
-              style={{
-                padding: '0.2rem 0.6rem',
-                borderRadius: '9999px',
-                background: '#e0f2fe',
-                color: 'var(--primary)',
-                fontSize: '0.75rem',
-                fontWeight: '800',
-              }}
-            >
-              STUDENT / ATITHI MARKETPLACE
-            </span>
-          </div>
 
-          <h1 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
-            Welcome back, {user?.name ? user.name.split(' ')[0] : (user?.customerType === 'ATITHI' ? 'Atithi Guest' : 'Student')}! 👋
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-            Select a nearby shop or hotel to browse its products and menu.
-          </p>
 
+<div className="container" style={{ padding: '2rem 0.5rem 4rem 0.5rem' }}>
+      {/* Promotional Poster Hero Banner & Search */}
+      <div className="hero-poster-wrapper">
+        <div className="hero-poster-card">
+          <img
+            src={heroPoster}
+            alt="NearCart - Everything You Need Just Around the Corner"
+            className="hero-poster-img"
+          />
+        </div>
+
+        <div className="hero-search-container">
           <SearchBar
             value={searchInput}
             onChange={handleSearchInputChange}
