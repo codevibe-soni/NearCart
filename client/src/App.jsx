@@ -4,6 +4,7 @@ import MainLayout from './layouts/MainLayout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import SplashScreen from './components/SplashScreen';
 import Student from './pages/Student';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
@@ -63,9 +64,11 @@ function GlobalRouteLoader({ children }) {
 
 function App() {
   return (
-    <BrowserRouter>
-      <GlobalRouteLoader>
-        <Suspense fallback={<PageFallback />}>
+    <>
+      <SplashScreen />
+      <BrowserRouter>
+        <GlobalRouteLoader>
+          <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path="/" element={<MainLayout />}>
             <Route index element={<Home />} />

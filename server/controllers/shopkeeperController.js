@@ -7,6 +7,7 @@ import Coupon from '../models/Coupon.js';
 import { validateDeliveryChargeSlabs, validateCoordinates } from '../utils/distanceCalculator.js';
 import { uploadBase64Image, generateCloudinarySignature } from '../services/cloudinaryService.js';
 import { assertNoBase64Image } from '../utils/imageGuard.js';
+import { validateClosingSchedule, getShopClosureStatus } from '../utils/shopClosure.js';
 
 // @route   POST /api/shopkeeper/cloudinary/sign
 // @desc    Generate server-side signed Cloudinary upload parameters for shopkeepers
@@ -191,12 +192,28 @@ export const createShop = async (req, res, next) => {
       coverImage,
       foodType,
       customFoodType,
+      weeklyClosingDays,
+      weeklyClosingEnabled,
+      specialClosingDates,
     } = req.body;
 
     if (!name || !category || !address) {
       return res.status(400).json({
         success: false,
         message: 'Shop name, category, and address are required.',
+      });
+    }
+
+    // Validate closing schedule if provided
+    const scheduleValidation = validateClosingSchedule({
+      weeklyClosingDays,
+      weeklyClosingEnabled,
+      specialClosingDates,
+    });
+    if (!scheduleValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: scheduleValidation.message,
       });
     }
 
@@ -282,6 +299,9 @@ export const createShop = async (req, res, next) => {
       isApproved: true, // Auto approve for convenience in development
       isActive: true,
       isOpen: true,
+      weeklyClosingDays: weeklyClosingDays || [],
+      weeklyClosingEnabled: weeklyClosingEnabled !== undefined ? Boolean(weeklyClosingEnabled) : true,
+      specialClosingDates: scheduleValidation.cleanSpecialClosingDates || specialClosingDates || [],
     });
 
     res.status(201).json({
@@ -303,9 +323,12 @@ export const getMyShop = async (req, res, next) => {
     const shop = await getShopWithOwnership(shopId, req.user._id, res, true);
     if (res.headersSent) return;
 
+    const closureStatus = shop ? getShopClosureStatus(shop) : null;
+
     res.status(200).json({
       success: true,
       shop: shop || null,
+      closureStatus,
     });
   } catch (error) {
     next(error);
@@ -349,6 +372,7 @@ export const updateShop = async (req, res, next) => {
       foodType,
       customFoodType,
       weeklyClosingDays,
+      weeklyClosingEnabled,
       specialClosingDates,
     } = req.body;
 
@@ -443,28 +467,32 @@ export const updateShop = async (req, res, next) => {
     if (isOpen !== undefined) shop.isOpen = Boolean(isOpen);
 
     // --- Closing Schedule ---
-    const VALID_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    if (weeklyClosingDays !== undefined) {
-      if (!Array.isArray(weeklyClosingDays)) {
-        return res.status(400).json({ success: false, message: 'weeklyClosingDays must be an array.' });
+    if (
+      weeklyClosingDays !== undefined ||
+      weeklyClosingEnabled !== undefined ||
+      specialClosingDates !== undefined
+    ) {
+      const scheduleValidation = validateClosingSchedule({
+        weeklyClosingDays,
+        weeklyClosingEnabled,
+        specialClosingDates,
+      });
+      if (!scheduleValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: scheduleValidation.message,
+        });
       }
-      const invalidDays = weeklyClosingDays.filter((d) => !VALID_DAYS.includes(d));
-      if (invalidDays.length > 0) {
-        return res.status(400).json({ success: false, message: `Invalid day(s): ${invalidDays.join(', ')}. Use full day names.` });
+
+      if (weeklyClosingDays !== undefined) {
+        shop.weeklyClosingDays = weeklyClosingDays;
       }
-      shop.weeklyClosingDays = weeklyClosingDays;
-    }
-    if (specialClosingDates !== undefined) {
-      if (!Array.isArray(specialClosingDates)) {
-        return res.status(400).json({ success: false, message: 'specialClosingDates must be an array.' });
+      if (weeklyClosingEnabled !== undefined) {
+        shop.weeklyClosingEnabled = Boolean(weeklyClosingEnabled);
       }
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      for (const entry of specialClosingDates) {
-        if (!entry.date || !dateRegex.test(entry.date)) {
-          return res.status(400).json({ success: false, message: `Invalid date format "${entry.date}". Use YYYY-MM-DD.` });
-        }
+      if (specialClosingDates !== undefined) {
+        shop.specialClosingDates = scheduleValidation.cleanSpecialClosingDates || specialClosingDates;
       }
-      shop.specialClosingDates = specialClosingDates;
     }
     if (upiEnabled !== undefined) shop.upiEnabled = Boolean(upiEnabled);
     if (upiId !== undefined) shop.upiId = upiId.trim();
@@ -507,6 +535,7 @@ export const updateShop = async (req, res, next) => {
       success: true,
       message: 'Shop details updated successfully',
       shop,
+      closureStatus: getShopClosureStatus(shop),
     });
   } catch (error) {
     next(error);

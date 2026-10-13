@@ -99,7 +99,7 @@ export const getProducts = async (req, res, next) => {
     const total = await Product.countDocuments(query);
     const products = await Product.find(query)
       .select('name price discountPrice unit stock images shop category rating totalRatings gstPercentage packingCharges createdAt')
-      .populate('shop', 'name logo rating address isOpen deliveryFee deliveryChargeSlabs')
+      .populate('shop', 'name logo rating address isOpen deliveryFee deliveryChargeSlabs openingTime closingTime weeklyClosingDays weeklyClosingEnabled specialClosingDates')
       .populate('category', 'name')
       .sort(sortOptions)
       .skip(skip)
@@ -142,7 +142,7 @@ export const getProductById = async (req, res, next) => {
     })
       .populate({
         path: 'shop',
-        select: 'name description logo rating totalRatings address phone isOpen openingTime closingTime isApproved isActive deliveryFee deliveryChargeSlabs upiEnabled upiId upiQrImage',
+        select: 'name description logo rating totalRatings address phone isOpen openingTime closingTime isApproved isActive deliveryFee deliveryChargeSlabs upiEnabled upiId upiQrImage weeklyClosingDays weeklyClosingEnabled specialClosingDates',
         match: { isApproved: true, isActive: true },
       })
       .populate('category', 'name image');

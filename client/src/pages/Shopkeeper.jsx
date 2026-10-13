@@ -27,8 +27,18 @@ import {
   Tag,
   MapPin,
   Navigation,
+  Calendar,
+  CalendarCheck,
+  CalendarX,
+  Info,
 } from 'lucide-react';
 import CouponManagement from '../components/CouponManagement';
+import {
+  isShopOpen,
+  getShopClosedReason,
+  getShopClosureDetails,
+  formatTimeAMPM,
+} from '../components/StudentUIComponents';
 
 export default function Shopkeeper() {
   const { user, refreshUser } = useAuth();
@@ -69,6 +79,9 @@ export default function Shopkeeper() {
     logo: '',
     coverImage: '',
     isOpen: true,
+    weeklyClosingDays: [],
+    weeklyClosingEnabled: true,
+    specialClosingDates: [],
     latitude: '',
     longitude: '',
   });
@@ -220,6 +233,9 @@ export default function Shopkeeper() {
             logo: shopRes.shop.logo || shopRes.shop.coverImage || '',
             coverImage: shopRes.shop.coverImage || shopRes.shop.logo || '',
             isOpen: shopRes.shop.isOpen !== undefined ? shopRes.shop.isOpen : true,
+            weeklyClosingDays: shopRes.shop.weeklyClosingDays || [],
+            weeklyClosingEnabled: shopRes.shop.weeklyClosingEnabled !== undefined ? shopRes.shop.weeklyClosingEnabled : true,
+            specialClosingDates: shopRes.shop.specialClosingDates || [],
             upiEnabled: shopRes.shop.upiEnabled !== undefined ? shopRes.shop.upiEnabled : true,
             upiId: shopRes.shop.upiId || '',
             upiQrImage: shopRes.shop.upiQrImage || '',
@@ -731,11 +747,22 @@ export default function Shopkeeper() {
               </button>
             )}
 
-            {shop && !isCreatingNewShop && (
-              <span style={{ padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: '700', background: shop.isOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: shop.isOpen ? 'var(--success)' : 'var(--danger)', border: `1px solid ${shop.isOpen ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
-                SHOP {shop.isOpen ? 'OPEN' : 'CLOSED'}
-              </span>
-            )}
+            {shop && !isCreatingNewShop && (() => {
+              const shopOpen = isShopOpen(shop);
+              const closedReason = !shopOpen ? getShopClosedReason(shop) : null;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '0.3rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: '700', background: shopOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: shopOpen ? 'var(--success)' : 'var(--danger)', border: `1px solid ${shopOpen ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
+                    SHOP {shopOpen ? 'OPEN' : 'CLOSED'}
+                  </span>
+                  {closedReason && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: '600', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {closedReason}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -871,6 +898,7 @@ export default function Shopkeeper() {
               { id: 'ORDERS', label: 'Orders', icon: ShoppingBag },
               { id: 'COUPONS', label: 'Coupons', icon: Tag },
               { id: 'REVIEWS', label: 'Reviews & Ratings', icon: Star },
+              { id: 'CLOSING_SCHEDULE', label: 'Closing Schedule', icon: CalendarX },
               { id: 'PAYMENT_SETTINGS', label: 'Payment Settings', icon: DollarSign },
               { id: 'MY_SHOP', label: 'Shop Settings', icon: Store },
               { id: 'PROFILE', label: 'My Profile', icon: User },
@@ -1756,6 +1784,18 @@ export default function Shopkeeper() {
             </div>
           )}
 
+          {/* TAB: CLOSING SCHEDULE MANAGER */}
+          {activeTab === 'CLOSING_SCHEDULE' && (
+            <ClosingScheduleManager
+              shop={shop}
+              shopForm={shopForm}
+              setShopForm={setShopForm}
+              setError={setError}
+              setSuccess={setSuccess}
+              fetchData={fetchData}
+            />
+          )}
+
           {/* TAB 6: MY PROFILE */}
           {activeTab === 'PROFILE' && user && (
             <div className="glass-card" style={{ maxWidth: '560px', padding: '2rem' }}>
@@ -2506,6 +2546,495 @@ export default function Shopkeeper() {
           .sk-products-mobile-cards {
             display: none !important;
           }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CLOSING SCHEDULE MANAGER COMPONENT
+   ────────────────────────────────────────────────────────────────────────── */
+const ALL_WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function ClosingScheduleManager({ shop, shopForm, setShopForm, setError, setSuccess, fetchData }) {
+  const [saving, setSaving] = useState(false);
+
+  // Special date form state
+  const [specialDateInput, setSpecialDateInput] = useState('');
+  const [specialReasonInput, setSpecialReasonInput] = useState('');
+  const [editingSpecialIndex, setEditingSpecialIndex] = useState(null);
+
+  // Compute the weekday name from a YYYY-MM-DD string
+  const getWeekdayFromDate = (dateStr) => {
+    if (!dateStr || dateStr.length < 10) return '';
+    try {
+      const d = new Date(dateStr + 'T12:00:00Z');
+      if (isNaN(d.getTime())) return '';
+      return new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(d);
+    } catch {
+      return '';
+    }
+  };
+
+  // Get today's date string in YYYY-MM-DD (IST)
+  const getTodayIST = () => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+    } catch {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+  };
+
+  // Get status label for a date
+  const getDateStatus = (dateStr) => {
+    const today = getTodayIST();
+    if (!dateStr) return 'unknown';
+    const clean = String(dateStr).trim().split('T')[0];
+    if (clean === today) return 'today';
+    return clean > today ? 'upcoming' : 'past';
+  };
+
+  // Toggle a weekday in the weeklyClosingDays array
+  const toggleWeekday = (day) => {
+    const current = shopForm.weeklyClosingDays || [];
+    const exists = current.some((d) => d.toLowerCase() === day.toLowerCase());
+    const updated = exists
+      ? current.filter((d) => d.toLowerCase() !== day.toLowerCase())
+      : [...current, day];
+    setShopForm((prev) => ({ ...prev, weeklyClosingDays: updated }));
+  };
+
+  // Add or update a special closing date
+  const handleAddSpecialDate = () => {
+    if (!specialDateInput) {
+      setError('Please select a date for the special closure.');
+      return;
+    }
+    if (!specialReasonInput.trim()) {
+      setError('A closure reason is required for special closing dates.');
+      return;
+    }
+
+    const cleanDate = specialDateInput.trim().split('T')[0];
+    const current = shopForm.specialClosingDates || [];
+
+    if (editingSpecialIndex !== null) {
+      // Updating existing entry — check duplicates excluding current index
+      const isDuplicate = current.some((s, i) => {
+        if (i === editingSpecialIndex) return false;
+        const sd = typeof s === 'string' ? s : s.date;
+        return String(sd).trim().split('T')[0] === cleanDate;
+      });
+      if (isDuplicate) {
+        setError(`A closure already exists for ${cleanDate}. Please choose a different date.`);
+        return;
+      }
+      const updated = [...current];
+      updated[editingSpecialIndex] = { date: cleanDate, reason: specialReasonInput.trim() };
+      setShopForm((prev) => ({ ...prev, specialClosingDates: updated }));
+      setEditingSpecialIndex(null);
+    } else {
+      // Adding new — check duplicates
+      const isDuplicate = current.some((s) => {
+        const sd = typeof s === 'string' ? s : s.date;
+        return String(sd).trim().split('T')[0] === cleanDate;
+      });
+      if (isDuplicate) {
+        setError(`A closure already exists for ${cleanDate}. Please choose a different date or edit the existing one.`);
+        return;
+      }
+      setShopForm((prev) => ({
+        ...prev,
+        specialClosingDates: [...(prev.specialClosingDates || []), { date: cleanDate, reason: specialReasonInput.trim() }],
+      }));
+    }
+
+    setSpecialDateInput('');
+    setSpecialReasonInput('');
+    setError('');
+  };
+
+  // Edit a special closing date entry
+  const handleEditSpecialDate = (index) => {
+    const entry = (shopForm.specialClosingDates || [])[index];
+    if (!entry) return;
+    const dateVal = typeof entry === 'string' ? entry : entry.date;
+    const reasonVal = typeof entry === 'object' && entry.reason ? entry.reason : '';
+    setSpecialDateInput(String(dateVal).trim().split('T')[0]);
+    setSpecialReasonInput(reasonVal);
+    setEditingSpecialIndex(index);
+  };
+
+  // Delete a special closing date entry with confirmation
+  const handleDeleteSpecialDate = (index) => {
+    const entry = (shopForm.specialClosingDates || [])[index];
+    if (!entry) return;
+    const dateVal = typeof entry === 'string' ? entry : entry.date;
+    const confirmed = window.confirm(`Are you sure you want to remove the special closure for ${String(dateVal).trim().split('T')[0]}?`);
+    if (!confirmed) return;
+    const updated = (shopForm.specialClosingDates || []).filter((_, i) => i !== index);
+    setShopForm((prev) => ({ ...prev, specialClosingDates: updated }));
+    if (editingSpecialIndex === index) {
+      setEditingSpecialIndex(null);
+      setSpecialDateInput('');
+      setSpecialReasonInput('');
+    }
+  };
+
+  // Save closing schedule to backend
+  const handleSaveSchedule = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await api.put(`/shopkeeper/shop?shopId=${shop._id}`, {
+        weeklyClosingDays: shopForm.weeklyClosingDays,
+        weeklyClosingEnabled: shopForm.weeklyClosingEnabled,
+        specialClosingDates: shopForm.specialClosingDates,
+      });
+      if (res.success) {
+        setSuccess('Closing schedule saved successfully!');
+        fetchData(shop._id);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to save closing schedule.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Compute live status for display
+  const closureDetails = getShopClosureDetails(shop);
+  const liveOpen = !closureDetails.isClosed;
+  const liveReason = closureDetails.reason;
+  const liveType = closureDetails.closureType;
+
+  // Sort special dates: today first, then upcoming, then past
+  const sortedSpecialDates = [...(shopForm.specialClosingDates || [])].map((entry, origIdx) => {
+    const dateVal = typeof entry === 'string' ? entry : entry.date;
+    const reasonVal = typeof entry === 'object' && entry.reason ? entry.reason : '';
+    const clean = String(dateVal).trim().split('T')[0];
+    return { date: clean, reason: reasonVal, originalIndex: origIdx };
+  }).sort((a, b) => {
+    const statusOrder = { today: 0, upcoming: 1, past: 2 };
+    const aStatus = getDateStatus(a.date);
+    const bStatus = getDateStatus(b.date);
+    if (statusOrder[aStatus] !== statusOrder[bStatus]) return statusOrder[aStatus] - statusOrder[bStatus];
+    return a.date.localeCompare(b.date);
+  });
+
+  const computedWeekday = getWeekdayFromDate(specialDateInput);
+
+  const sectionCardStyle = {
+    background: '#ffffff',
+    border: '1px solid var(--border-color)',
+    borderRadius: '0.75rem',
+    padding: '1.5rem',
+    marginBottom: '1.5rem',
+  };
+
+  const pillBaseStyle = (active) => ({
+    padding: '0.4rem 0.9rem',
+    borderRadius: '9999px',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    border: active ? '2px solid var(--danger)' : '2px solid var(--border-color)',
+    background: active ? 'rgba(239, 68, 68, 0.1)' : '#f8fafc',
+    color: active ? 'var(--danger)' : 'var(--text-secondary)',
+    transition: 'all 0.2s ease',
+    userSelect: 'none',
+  });
+
+  const statusBadge = (status) => {
+    const map = {
+      today: { bg: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', text: 'TODAY' },
+      upcoming: { bg: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', text: 'UPCOMING' },
+      past: { bg: 'rgba(156, 163, 175, 0.15)', color: '#6b7280', text: 'PAST' },
+    };
+    const s = map[status] || map.past;
+    return (
+      <span style={{ padding: '0.15rem 0.5rem', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: '800', background: s.bg, color: s.color, letterSpacing: '0.02em' }}>
+        {s.text}
+      </span>
+    );
+  };
+
+  return (
+    <div style={{ maxWidth: '720px' }}>
+      <h3 style={{ fontSize: '1.35rem', fontWeight: '700', marginBottom: '0.25rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <CalendarX size={22} /> Closing Schedule Manager
+      </h3>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+        Configure weekly closing days and special closure dates. Students will see live closure status and reasons.
+      </p>
+
+      {/* ─── LIVE STATUS CARD ─── */}
+      <div style={{
+        ...sectionCardStyle,
+        background: liveOpen ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02))',
+        border: `1.5px solid ${liveOpen ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <span style={{
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: liveOpen ? '#10b981' : '#ef4444',
+                boxShadow: liveOpen ? '0 0 8px rgba(16, 185, 129, 0.5)' : '0 0 8px rgba(239, 68, 68, 0.5)',
+                animation: 'pulse 2s infinite',
+              }} />
+              <span style={{ fontSize: '1.05rem', fontWeight: '800', color: liveOpen ? '#059669' : '#dc2626' }}>
+                {liveOpen ? 'CURRENTLY OPEN' : 'CURRENTLY CLOSED'}
+              </span>
+            </div>
+            {!liveOpen && liveReason && (
+              <span style={{ fontSize: '0.85rem', color: '#b91c1c', fontWeight: '500' }}>
+                {liveReason}
+              </span>
+            )}
+            {liveOpen && shop?.openingTime && shop?.closingTime && (
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Hours: {formatTimeAMPM(shop.openingTime)} – {formatTimeAMPM(shop.closingTime)}
+              </span>
+            )}
+          </div>
+          {liveType && (
+            <span style={{
+              padding: '0.25rem 0.65rem', borderRadius: '0.4rem', fontSize: '0.72rem',
+              fontWeight: '700', background: 'rgba(239, 68, 68, 0.1)', color: '#b91c1c',
+              textTransform: 'uppercase', letterSpacing: '0.04em',
+            }}>
+              {liveType.replace(/_/g, ' ')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ─── WEEKLY CLOSING DAYS ─── */}
+      <div style={sectionCardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Calendar size={18} /> Weekly Closing Days
+          </h4>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', color: shopForm.weeklyClosingEnabled ? 'var(--success)' : 'var(--text-muted)' }}>
+            <input
+              type="checkbox"
+              checked={shopForm.weeklyClosingEnabled !== false}
+              onChange={(e) => setShopForm((prev) => ({ ...prev, weeklyClosingEnabled: e.target.checked }))}
+              style={{ width: '1rem', height: '1rem', accentColor: 'var(--success)', cursor: 'pointer' }}
+            />
+            {shopForm.weeklyClosingEnabled !== false ? 'Enabled' : 'Disabled'}
+          </label>
+        </div>
+
+        {shopForm.weeklyClosingEnabled === false && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 0.85rem', background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '0.5rem', marginBottom: '1rem' }}>
+            <Info size={15} style={{ color: '#b45309', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.8rem', color: '#92400e' }}>
+              Weekly schedule is disabled. Your shop will ignore weekly closing days.
+            </span>
+          </div>
+        )}
+
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+          Select the days your shop remains closed every week:
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {ALL_WEEKDAYS.map((day) => {
+            const isActive = (shopForm.weeklyClosingDays || []).some((d) => d.toLowerCase() === day.toLowerCase());
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleWeekday(day)}
+                style={pillBaseStyle(isActive)}
+                title={isActive ? `Remove ${day} from closing days` : `Add ${day} as a closing day`}
+              >
+                {isActive ? <CalendarX size={13} style={{ marginRight: '0.25rem', verticalAlign: 'middle' }} /> : null}
+                {day.slice(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+
+        {(shopForm.weeklyClosingDays || []).length > 0 && (
+          <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            <strong>Closed on:</strong> {(shopForm.weeklyClosingDays || []).join(', ')}
+          </div>
+        )}
+      </div>
+
+      {/* ─── SPECIAL CLOSING DATES ─── */}
+      <div style={sectionCardStyle}>
+        <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <CalendarCheck size={18} /> Special Closing Dates
+        </h4>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+          Add one-time closures for holidays, maintenance, or events. Each requires a reason shown to students.
+        </p>
+
+        {/* Add/Edit Form */}
+        <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.6rem', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <div>
+              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
+                Closure Date *
+              </label>
+              <input
+                type="date"
+                className="form-input"
+                value={specialDateInput}
+                onChange={(e) => setSpecialDateInput(e.target.value)}
+                style={{ padding: '0.45rem 0.6rem', fontSize: '0.85rem' }}
+              />
+              {computedWeekday && (
+                <span style={{ display: 'inline-block', marginTop: '0.3rem', padding: '0.15rem 0.5rem', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: '700' }}>
+                  {computedWeekday}
+                </span>
+              )}
+            </div>
+            <div>
+              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem' }}>
+                Reason * <span style={{ fontWeight: '400', color: 'var(--text-muted)' }}>(shown to students)</span>
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Diwali Holiday, Stock Inventory..."
+                value={specialReasonInput}
+                onChange={(e) => setSpecialReasonInput(e.target.value)}
+                maxLength={120}
+                style={{ padding: '0.45rem 0.6rem', fontSize: '0.85rem' }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleAddSpecialDate}
+              style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+            >
+              <Plus size={14} style={{ marginRight: '0.25rem', verticalAlign: 'middle' }} />
+              {editingSpecialIndex !== null ? 'Update Date' : 'Add Closing Date'}
+            </button>
+            {editingSpecialIndex !== null && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setEditingSpecialIndex(null);
+                  setSpecialDateInput('');
+                  setSpecialReasonInput('');
+                }}
+                style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Special Dates Table */}
+        {sortedSpecialDates.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem', background: '#fafafa', borderRadius: '0.6rem', border: '1px dashed var(--border-color)' }}>
+            <CalendarCheck size={28} style={{ color: 'var(--text-muted)', marginBottom: '0.35rem' }} />
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+              No special closing dates configured yet.
+            </p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Date</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Day</th>
+                  <th style={{ textAlign: 'left', padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Reason</th>
+                  <th style={{ textAlign: 'center', padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Status</th>
+                  <th style={{ textAlign: 'right', padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSpecialDates.map((entry) => {
+                  const dayName = getWeekdayFromDate(entry.date);
+                  const status = getDateStatus(entry.date);
+                  return (
+                    <tr key={entry.originalIndex} style={{ borderBottom: '1px solid var(--border-color)', opacity: status === 'past' ? 0.55 : 1 }}>
+                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                        {entry.date}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-secondary)' }}>
+                        {dayName || '—'}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.reason || '—'}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                        {statusBadge(status)}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleEditSpecialDate(entry.originalIndex)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: '0.8rem', fontWeight: '600', marginRight: '0.5rem' }}
+                          title="Edit this closure"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSpecialDate(entry.originalIndex)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem', fontWeight: '600' }}
+                          title="Delete this closure"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ─── SAVE BUTTON ─── */}
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={handleSaveSchedule}
+        disabled={saving}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          fontSize: '0.95rem',
+          fontWeight: '700',
+          marginTop: '0.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+        }}
+      >
+        <CheckCircle2 size={18} />
+        {saving ? 'Saving Schedule...' : 'Save Closing Schedule'}
+      </button>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
     </div>

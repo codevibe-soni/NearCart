@@ -1,6 +1,7 @@
 import Cart from '../models/Cart.js';
 import Product from '../models/Product.js';
 import Shop from '../models/Shop.js';
+import { getShopClosureStatus } from '../utils/shopClosure.js';
 
 /**
  * @desc    Get current student's cart
@@ -16,7 +17,7 @@ export const getCart = async (req, res) => {
       })
       .populate({
         path: 'items.shop',
-        select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage'
+        select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage weeklyClosingDays weeklyClosingEnabled specialClosingDates'
       });
 
     if (!cart) {
@@ -118,12 +119,17 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    // Check if shop is currently open (isOpen is the authoritative source of truth)
-    if (!product.shop.isOpen) {
+    // Check if shop is currently open (evaluated with weekly schedule, special closing dates & manual toggle)
+    const closureStatus = getShopClosureStatus(product.shop);
+    if (closureStatus.isClosed) {
       return res.status(403).json({
         success: false,
         shopClosed: true,
-        message: 'Shop is currently closed. You can browse products, but ordering is unavailable.',
+        code: 'SHOP_CLOSED',
+        message: `Cannot add items to cart because ${product.shop.name} is currently closed.`,
+        reason: closureStatus.reason || 'Shop is currently closed.',
+        closureType: closureStatus.closureType,
+        details: closureStatus.notificationMessage,
       });
     }
 
@@ -186,7 +192,7 @@ export const addToCart = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage weeklyClosingDays weeklyClosingEnabled specialClosingDates' },
     ]);
 
     return res.status(200).json({
@@ -246,7 +252,10 @@ export const updateCartItem = async (req, res) => {
       cart.items.splice(itemIndex, 1);
     } else {
       // Check stock availability
-      const product = await Product.findById(productId).populate('shop', 'isOpen isApproved isActive name');
+      const product = await Product.findById(productId).populate(
+        'shop',
+        'isOpen isApproved isActive name weeklyClosingDays weeklyClosingEnabled specialClosingDates openingTime closingTime'
+      );
       if (!product || !product.isAvailable) {
         return res.status(400).json({
           success: false,
@@ -256,12 +265,19 @@ export const updateCartItem = async (req, res) => {
 
       // Re-check shop open status when increasing quantity
       const isIncrease = qty > cart.items[itemIndex].quantity;
-      if (isIncrease && (!product.shop || !product.shop.isOpen)) {
-        return res.status(403).json({
-          success: false,
-          shopClosed: true,
-          message: 'Shop is currently closed. Increasing item quantity is unavailable.',
-        });
+      if (isIncrease) {
+        const closureStatus = getShopClosureStatus(product.shop);
+        if (closureStatus.isClosed) {
+          return res.status(403).json({
+            success: false,
+            shopClosed: true,
+            code: 'SHOP_CLOSED',
+            message: `Cannot increase item quantity because ${product.shop?.name || 'Shop'} is currently closed.`,
+            reason: closureStatus.reason || 'This shop is currently closed.',
+            closureType: closureStatus.closureType,
+            details: closureStatus.notificationMessage,
+          });
+        }
       }
 
       if (product.stock < qty) {
@@ -284,7 +300,7 @@ export const updateCartItem = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage weeklyClosingDays weeklyClosingEnabled specialClosingDates' },
     ]);
 
     return res.status(200).json({
@@ -327,7 +343,7 @@ export const removeCartItem = async (req, res) => {
 
     await cart.populate([
       { path: 'items.product', select: 'name price discountPrice images isAvailable stock unit shop' },
-      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage' },
+      { path: 'items.shop', select: 'name isApproved isActive isOpen openingTime closingTime deliveryFee deliveryChargeSlabs location minimumOrder upiEnabled upiId upiQrImage weeklyClosingDays weeklyClosingEnabled specialClosingDates' },
     ]);
 
     return res.status(200).json({

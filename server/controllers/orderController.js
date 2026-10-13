@@ -14,6 +14,7 @@ import { getIO } from '../config/socket.js';
 import { sendPushToUser, sendPushToTokens } from '../services/pushNotificationService.js';
 import { sendOrderPlacedEmailToShopkeeper } from '../services/emailService.js';
 import { calculateDeliveryFeeForShopAndAddress, calculateDeliveryFeeFromDistance } from '../utils/distanceCalculator.js';
+import { getShopClosureStatus } from '../utils/shopClosure.js';
 
 
 /**
@@ -235,12 +236,17 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Closed shop protection — final security boundary
-      if (!shop.isOpen) {
+      // Closed shop protection — scheduled closure & manual toggle boundary
+      const closureStatus = getShopClosureStatus(shop);
+      if (closureStatus.isClosed) {
         return res.status(403).json({
           success: false,
           shopClosed: true,
+          code: 'SHOP_CLOSED',
           message: `Cannot place order because ${shop.name} is currently closed.`,
+          reason: closureStatus.reason || 'This shop is currently closed.',
+          closureType: closureStatus.closureType,
+          details: closureStatus.notificationMessage,
         });
       }
 
@@ -294,11 +300,16 @@ export const createOrder = async (req, res) => {
       }
 
       // Closed shop protection — final security boundary for cart-based orders
-      if (!shop.isOpen) {
+      const closureStatus = getShopClosureStatus(shop);
+      if (closureStatus.isClosed) {
         return res.status(403).json({
           success: false,
           shopClosed: true,
+          code: 'SHOP_CLOSED',
           message: `Cannot place order because ${shop.name} is currently closed.`,
+          reason: closureStatus.reason || 'This shop is currently closed.',
+          closureType: closureStatus.closureType,
+          details: closureStatus.notificationMessage,
         });
       }
 

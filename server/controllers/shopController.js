@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Shop from '../models/Shop.js';
 import Category from '../models/Category.js';
+import { getShopClosureStatus } from '../utils/shopClosure.js';
 
 // @route   GET /api/shops
 // @desc    Get all active and approved shops with search & category filter
@@ -39,10 +40,19 @@ export const getShops = async (req, res, next) => {
       .select('-owner')
       .sort({ rating: -1, name: 1 });
 
+    const shopsWithStatus = shops.map((s) => {
+      const closure = getShopClosureStatus(s);
+      const obj = s.toObject ? s.toObject() : { ...s };
+      obj.isCurrentlyOpen = closure.isOpen;
+      obj.closedReason = closure.displayReason;
+      obj.closureDetails = closure;
+      return obj;
+    });
+
     res.status(200).json({
       success: true,
-      count: shops.length,
-      shops,
+      count: shopsWithStatus.length,
+      shops: shopsWithStatus,
     });
   } catch (error) {
     next(error);
@@ -78,9 +88,16 @@ export const getShopById = async (req, res, next) => {
       });
     }
 
+    const closure = getShopClosureStatus(shop);
+    const shopObj = shop.toObject ? shop.toObject() : { ...shop };
+    shopObj.isCurrentlyOpen = closure.isOpen;
+    shopObj.closedReason = closure.displayReason;
+    shopObj.closureDetails = closure;
+
     res.status(200).json({
       success: true,
-      shop,
+      shop: shopObj,
+      closureStatus: closure,
     });
   } catch (error) {
     next(error);

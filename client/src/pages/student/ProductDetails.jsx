@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProductById } from '../../services/studentService';
 import api from '../../services/api';
-import { LoadingSpinner, isShopOpen, formatTimeAMPM } from '../../components/StudentUIComponents';
+import { LoadingSpinner, isShopOpen, getShopClosedReason, formatTimeAMPM } from '../../components/StudentUIComponents';
 import { ArrowLeft, ChevronLeft, ChevronRight, X, Maximize2, ShoppingCart, Zap, Plus, Minus, Star, MessageSquare, User, AlertCircle } from 'lucide-react';
 
 export default function ProductDetails() {
@@ -393,11 +393,14 @@ export default function ProductDetails() {
                 >
                   <AlertCircle size={20} style={{ color: '#dc2626', flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#991b1b', fontSize: '0.9rem' }}>Shop Closed</strong>
-                    <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.8rem', color: '#b91c1c' }}>
-                      You can browse products, but ordering is currently unavailable.
-                      {product.shop.openingTime && (
-                        <> Opens at <strong>{formatTimeAMPM(product.shop.openingTime)}</strong>.</>
+                    <strong style={{ color: '#991b1b', fontSize: '0.9rem' }}>
+                      {product.shop.name} is Currently Closed
+                    </strong>
+                    <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.82rem', color: '#b91c1c' }}>
+                      {getShopClosedReason(product.shop) ? (
+                        <><strong>Reason:</strong> {getShopClosedReason(product.shop)}. Ordering is currently disabled.</>
+                      ) : (
+                        <>Ordering is currently unavailable.{product.shop.openingTime && (<> Opens at <strong>{formatTimeAMPM(product.shop.openingTime)}</strong>.</>)}</>
                       )}
                     </p>
                   </div>

@@ -77,6 +77,10 @@ const shopSchema = new mongoose.Schema(
       enum: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
       default: [],
     },
+    weeklyClosingEnabled: {
+      type: Boolean,
+      default: true,
+    },
     // Closing Schedule: specific date-based closures
     specialClosingDates: [
       {

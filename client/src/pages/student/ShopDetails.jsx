@@ -303,9 +303,10 @@ export default function ShopDetails() {
               {shop.name} is Currently Closed
             </h4>
             <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: '#b91c1c' }}>
-              You can browse products, but ordering is currently unavailable.
-              {hasTiming && openTimeFormatted && (
-                <> Opens at <strong>{openTimeFormatted}</strong>.</>
+              {closedReason ? (
+                <><strong>Reason:</strong> {closedReason}. You can browse products, but ordering is currently disabled.</>
+              ) : (
+                <>You can browse products, but ordering is currently unavailable.{hasTiming && openTimeFormatted && (<> Opens at <strong>{openTimeFormatted}</strong>.</>)}</>
               )}
             </p>
           </div>

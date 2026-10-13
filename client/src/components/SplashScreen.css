@@ -1,0 +1,102 @@
+/* SplashScreen.css */
+.splash-overlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff; /* use light background; adjust if dark theme */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-wrapper {
+  /* Combine scale and mask reveal for premium effect */
+  animation: logoScale 0.8s ease-out forwards, maskReveal 1s ease-out forwards;
+  /* Ensure the mask applies to the inner img */
+  overflow: hidden;
+}
+
+/* Scale animation (keeps existing behavior) */
+@keyframes logoScale {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Mask reveal animation simulating a draw effect */
+@keyframes maskReveal {
+  0% {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 0%);
+    mask-image: linear-gradient(to right, transparent 0%, black 0%);
+  }
+  100% {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 100%);
+  }
+}
+
+/* Apply the mask to the actual image inside the wrapper */
+.logo-wrapper img {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 0%);
+  mask-image: linear-gradient(to right, transparent 0%, black 0%);
+}
+
+
+.brand-name {
+  display: flex;
+  gap: 0.2rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111827; /* near text color */
+}
+
+.brand-letter {
+  opacity: 0;
+  animation: fadeInLetter 0.4s ease-out forwards;
+}
+
+@keyframes fadeInLetter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Hide splash after total duration (logo + letters) */
+@keyframes splashFadeOut {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.splash-overlay.finished {
+  animation: splashFadeOut 0.5s ease-out forwards;
+  animation-delay: 2.2s; /* adjust to match total animation length */
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .logo-wrapper,
+  .brand-letter {
+    animation: none;
+  }
+}

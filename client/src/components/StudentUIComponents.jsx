@@ -104,23 +104,84 @@ export function formatTimeAMPM(timeStr) {
   return `${strHours}:${minutes} ${ampm}`;
 }
 
-/** Returns a reason string if closed due to schedule, or null if not scheduled-closed */
-export function getShopClosedReason(shop) {
-  if (!shop) return null;
+export const BUSINESS_TIMEZONE = 'Asia/Kolkata';
+
+export function parseMinutes(tStr) {
+  if (!tStr) return null;
+  let time = String(tStr).trim();
+  let isPM = false;
+  let isAM = false;
+  if (time.toUpperCase().includes('PM')) { isPM = true; time = time.replace(/PM/i, '').trim(); }
+  if (time.toUpperCase().includes('AM')) { isAM = true; time = time.replace(/AM/i, '').trim(); }
+  const parts = time.split(':');
+  if (parts.length < 2) return null;
+  let h = parseInt(parts[0], 10);
+  let m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  if (isPM && h < 12) h += 12;
+  if (isAM && h === 12) h = 0;
+  return h * 60 + m;
+}
+
+/**
+ * Returns comprehensive closure details for a shop based on current date, timezone, schedule, and hours.
+ */
+export function getShopClosureDetails(shop) {
+  if (!shop) {
+    return {
+      isOpen: false,
+      isClosed: true,
+      closureType: 'NOT_FOUND',
+      reason: 'Shop unavailable',
+      notificationMessage: 'This shop is currently unavailable.',
+    };
+  }
+
+  if (shop.isActive === false || shop.isApproved === false) {
+    return {
+      isOpen: false,
+      isClosed: true,
+      closureType: 'INACTIVE',
+      reason: 'Shop unavailable',
+      notificationMessage: 'This shop is currently not active or available on NearCart.',
+    };
+  }
+
   const now = new Date();
+  let localDate = '';
+  let localDayName = '';
+  let timeStr = '';
 
-  // Use Intl.DateTimeFormat to extract the local YYYY-MM-DD calendar date safely.
-  const localDate = new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now); // yields "YYYY-MM-DD"
+  try {
+    localDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BUSINESS_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
 
-  const localDayName = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-  }).format(now); // yields e.g. "Sunday"
+    localDayName = new Intl.DateTimeFormat('en-US', {
+      timeZone: BUSINESS_TIMEZONE,
+      weekday: 'long',
+    }).format(now);
 
-  // 1. Check special closing dates first (stored as YYYY-MM-DD strings or objects)
+    timeStr = new Intl.DateTimeFormat('en-GB', {
+      timeZone: BUSINESS_TIMEZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(now);
+  } catch {
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    localDate = `${y}-${m}-${d}`;
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    localDayName = days[now.getDay()];
+    timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+
+  // 1. Special closing dates first (highest priority: overrides weekly message if both apply)
   if (Array.isArray(shop.specialClosingDates) && shop.specialClosingDates.length > 0) {
     const special = shop.specialClosingDates.find((s) => {
       if (!s) return false;
@@ -129,69 +190,124 @@ export function getShopClosedReason(shop) {
       const cleanSDate = String(sDateRaw).trim().split('T')[0];
       return cleanSDate === localDate;
     });
+
     if (special) {
-      return special.reason ? `Closed today: ${special.reason}` : 'Closed today';
+      const rawReason = (typeof special === 'object' && special.reason) ? special.reason.trim() : '';
+      const reasonDisplay = rawReason ? `Closed today: ${rawReason}` : 'Closed today';
+      const notification = rawReason
+        ? `Sorry! This shop is currently closed. Reason: ${rawReason}. Please visit again when the shop reopens.`
+        : 'Sorry! This shop is currently closed today for a scheduled holiday. Please visit again when the shop reopens.';
+
+      return {
+        isOpen: false,
+        isClosed: true,
+        closureType: 'SPECIAL_DATE',
+        reason: reasonDisplay,
+        rawReason: rawReason || 'Scheduled special closure',
+        notificationMessage: notification,
+        date: localDate,
+        dayName: localDayName,
+      };
     }
   }
 
-  // 2. Check weekly closing days (case-insensitive & short-name tolerant)
-  if (Array.isArray(shop.weeklyClosingDays) && shop.weeklyClosingDays.length > 0) {
+  // 2. Weekly closing days check (if weekly schedule is enabled)
+  const weeklyEnabled = shop.weeklyClosingEnabled !== false;
+  if (weeklyEnabled && Array.isArray(shop.weeklyClosingDays) && shop.weeklyClosingDays.length > 0) {
     const isWeeklyClosed = shop.weeklyClosingDays.some((day) => {
       if (!day || typeof day !== 'string') return false;
       const d = day.trim().toLowerCase();
-      const full = localDayName.toLowerCase();
-      const short = full.slice(0, 3);
-      return d === full || d === short;
+      const currentFull = localDayName.toLowerCase();
+      const currentShort = currentFull.slice(0, 3);
+      return d === currentFull || d === currentShort;
     });
+
     if (isWeeklyClosed) {
-      return `Closed every ${localDayName}`;
+      return {
+        isOpen: false,
+        isClosed: true,
+        closureType: 'WEEKLY_DAY',
+        reason: `Closed every ${localDayName}`,
+        rawReason: `Closed every ${localDayName}`,
+        notificationMessage: `This shop is closed every ${localDayName}. Please visit again on its next opening day.`,
+        date: localDate,
+        dayName: localDayName,
+      };
     }
   }
 
-  return null;
+  // 3. Manual toggle
+  if (shop.isOpen === false) {
+    return {
+      isOpen: false,
+      isClosed: true,
+      closureType: 'MANUAL',
+      reason: 'Temporarily Closed',
+      rawReason: 'Temporarily closed by owner',
+      notificationMessage: 'Sorry! This shop is temporarily closed by the owner. Please visit again later.',
+      date: localDate,
+      dayName: localDayName,
+    };
+  }
+
+  // 4. Operating hours check
+  if (shop.openingTime && shop.closingTime) {
+    const openMin = parseMinutes(shop.openingTime);
+    const closeMin = parseMinutes(shop.closingTime);
+
+    if (openMin !== null && closeMin !== null) {
+      const currentMin = parseMinutes(timeStr);
+      let withinHours = false;
+
+      if (openMin < closeMin) {
+        withinHours = currentMin >= openMin && currentMin < closeMin;
+      } else if (openMin > closeMin) {
+        withinHours = currentMin >= openMin || currentMin < closeMin;
+      } else {
+        withinHours = true;
+      }
+
+      if (!withinHours) {
+        const openFormatted = formatTimeAMPM(shop.openingTime);
+        const closeFormatted = formatTimeAMPM(shop.closingTime);
+        return {
+          isOpen: false,
+          isClosed: true,
+          closureType: 'HOURS',
+          reason: `Closed • Opens at ${openFormatted}`,
+          rawReason: `Outside operating hours (${openFormatted} – ${closeFormatted})`,
+          notificationMessage: `This shop is currently closed. Normal operating hours are ${openFormatted} – ${closeFormatted}. Please visit again when the shop opens.`,
+          date: localDate,
+          dayName: localDayName,
+        };
+      }
+    }
+  }
+
+  return {
+    isOpen: true,
+    isClosed: false,
+    closureType: null,
+    reason: null,
+    rawReason: null,
+    notificationMessage: null,
+    date: localDate,
+    dayName: localDayName,
+  };
 }
 
+/** Returns a concise reason string if closed, or null if open */
+export function getShopClosedReason(shop) {
+  if (!shop) return null;
+  const details = getShopClosureDetails(shop);
+  return details.isClosed ? details.reason : null;
+}
+
+/** Returns true if shop is currently open and accepting orders */
 export function isShopOpen(shop) {
   if (!shop) return false;
   if (shop.isActive === false || shop.isApproved === false) return false;
-  if (shop.isOpen === false) return false;
-
-  // Check closing schedule before time window
-  if (getShopClosedReason(shop)) return false;
-
-  if (!shop.openingTime || !shop.closingTime) return shop.isOpen !== false;
-
-  const parseMinutes = (tStr) => {
-    if (!tStr) return null;
-    let time = tStr.trim();
-    let isPM = false;
-    let isAM = false;
-    if (time.toUpperCase().includes('PM')) { isPM = true; time = time.replace(/PM/i, '').trim(); }
-    if (time.toUpperCase().includes('AM')) { isAM = true; time = time.replace(/AM/i, '').trim(); }
-    const parts = time.split(':');
-    if (parts.length < 2) return null;
-    let h = parseInt(parts[0], 10);
-    let m = parseInt(parts[1], 10);
-    if (isNaN(h) || isNaN(m)) return null;
-    if (isPM && h < 12) h += 12;
-    if (isAM && h === 12) h = 0;
-    return h * 60 + m;
-  };
-
-  const openMin = parseMinutes(shop.openingTime);
-  const closeMin = parseMinutes(shop.closingTime);
-
-  if (openMin === null || closeMin === null) return shop.isOpen !== false;
-
-  const now = new Date();
-  const currentMin = now.getHours() * 60 + now.getMinutes();
-
-  if (openMin < closeMin) {
-    return currentMin >= openMin && currentMin < closeMin;
-  } else if (openMin > closeMin) {
-    return currentMin >= openMin || currentMin < closeMin;
-  }
-  return true;
+  return !getShopClosureDetails(shop).isClosed;
 }
 
 export function ShopCard({ shop, onClick }) {
@@ -206,20 +322,31 @@ export function ShopCard({ shop, onClick }) {
     <div
       onClick={onClick}
       className="glass-card"
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', height: '100%' }}
+      style={{
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        position: 'relative',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+        background: !currentlyOpen ? 'linear-gradient(180deg, #ffffff 0%, #fef2f2 100%)' : '#ffffff',
+        border: !currentlyOpen ? '1px solid #fecaca' : '1px solid var(--border-color)',
+        opacity: !currentlyOpen ? 0.92 : 1,
+      }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.85rem' }}>
-        <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', minWidth: 0 }}>
           {shopImage ? (
             <img
               src={shopImage}
               alt={shop.name}
               style={{
-                width: '3rem',
-                height: '3rem',
+                width: '3.2rem',
+                height: '3.2rem',
                 borderRadius: '0.5rem',
                 objectFit: 'cover',
                 border: '1px solid var(--border-color)',
+                flexShrink: 0,
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -229,24 +356,27 @@ export function ShopCard({ shop, onClick }) {
           ) : null}
           <div
             style={{
-              width: '3rem',
-              height: '3rem',
+              width: '3.2rem',
+              height: '3.2rem',
               borderRadius: '0.5rem',
-              background: '#e0f2fe',
+              background: !currentlyOpen ? '#fee2e2' : '#e0f2fe',
               display: shopImage ? 'none' : 'flex',
               alignItems: 'center',
               justify: 'center',
               fontWeight: '700',
-              color: 'var(--primary)',
+              color: !currentlyOpen ? '#b91c1c' : 'var(--primary)',
               fontSize: '1.2rem',
-              border: '1px solid #bae6fd',
+              border: `1px solid ${!currentlyOpen ? '#fca5a5' : '#bae6fd'}`,
+              flexShrink: 0,
             }}
           >
             {shop.name ? shop.name.charAt(0).toUpperCase() : 'S'}
           </div>
-          <div>
-            <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>{shop.name}</h4>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <div style={{ minWidth: 0 }}>
+            <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {shop.name}
+            </h4>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
               {shop.category?.name || 'General Store'}{shop.foodType ? ` • ${shop.foodType}` : ''}
             </span>
           </div>
@@ -255,10 +385,11 @@ export function ShopCard({ shop, onClick }) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem', flexShrink: 0 }}>
           <span
             style={{
-              padding: '0.2rem 0.6rem',
+              padding: '0.25rem 0.65rem',
               borderRadius: '9999px',
               fontSize: '0.75rem',
-              fontWeight: '600',
+              fontWeight: '800',
+              letterSpacing: '0.02em',
               background: !currentlyOpen ? '#fee2e2' : !hasTiming ? '#f1f5f9' : '#d1fae5',
               color: !currentlyOpen ? '#b91c1c' : !hasTiming ? '#64748b' : '#047857',
               border: `1px solid ${!currentlyOpen ? '#fca5a5' : !hasTiming ? '#cbd5e1' : '#a7f3d0'}`,
@@ -268,14 +399,28 @@ export function ShopCard({ shop, onClick }) {
             {!currentlyOpen ? 'CLOSED' : !hasTiming ? 'Hours not set' : 'OPEN'}
           </span>
           {closedReason && (
-            <span style={{ fontSize: '0.68rem', color: '#b91c1c', textAlign: 'right', maxWidth: '120px', lineHeight: '1.2' }}>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                color: '#b91c1c',
+                fontWeight: '600',
+                textAlign: 'right',
+                maxWidth: '140px',
+                lineHeight: '1.2',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+              title={closedReason}
+            >
               {closedReason}
             </span>
           )}
         </div>
       </div>
 
-      <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', flex: 1 }}>
+      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', flex: 1, lineHeight: '1.4' }}>
         {shop.description || 'Campus shop providing essential goods.'}
       </p>
 
@@ -297,6 +442,127 @@ export function ShopCard({ shop, onClick }) {
       >
         <span>⭐ {shop.rating?.toFixed(1) || '4.5'} ({shop.totalRatings || 0})</span>
         <span>Delivery: ₹{shop.deliveryFee || 0}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Modal shown to students when clicking a closed shop or hotel card
+ */
+export function ClosedShopModal({ shop, isOpen, onClose, onBrowseMenu }) {
+  if (!isOpen || !shop) return null;
+  const details = getShopClosureDetails(shop);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="glass-card"
+        style={{
+          maxWidth: '460px',
+          width: '100%',
+          background: '#ffffff',
+          borderRadius: '1rem',
+          padding: '1.75rem',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #fee2e2',
+          textAlign: 'center',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            width: '3.75rem',
+            height: '3.75rem',
+            borderRadius: '50%',
+            background: '#fee2e2',
+            color: '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 1.25rem auto',
+            fontSize: '1.75rem',
+          }}
+        >
+          🔒
+        </div>
+
+        <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginBottom: '0.4rem' }}>
+          {shop.name} is Closed
+        </h3>
+
+        <div
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '0.625rem',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+            Closure Notice
+          </div>
+          <p style={{ margin: 0, fontSize: '0.9rem', color: '#b91c1c', fontWeight: '600', lineHeight: '1.4' }}>
+            {details.notificationMessage || 'This shop is currently not accepting orders.'}
+          </p>
+        </div>
+
+        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+          Orders cannot be placed while this business is closed. You may view their product catalog in read-only mode or explore other open campus shops.
+        </p>
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
+          {onBrowseMenu && (
+            <button
+              onClick={() => {
+                onClose();
+                onBrowseMenu();
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '0.65rem 1rem',
+                fontSize: '0.9rem',
+                fontWeight: '700',
+                width: '100%',
+                justifyContent: 'center',
+              }}
+            >
+              Browse Menu in View-Only Mode
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="btn-primary"
+            style={{
+              padding: '0.65rem 1rem',
+              fontSize: '0.9rem',
+              fontWeight: '700',
+              width: '100%',
+              justifyContent: 'center',
+              background: '#0284c7',
+            }}
+          >
+            Explore Other Open Shops
+          </button>
+        </div>
       </div>
     </div>
   );

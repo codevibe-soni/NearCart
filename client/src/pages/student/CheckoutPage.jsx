@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { detectUserLocality } from '../../utils/locationService';
-import { isShopOpen } from '../../components/StudentUIComponents';
+import { isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
 import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2, Lock } from 'lucide-react';
 
 export default function CheckoutPage() {
@@ -318,7 +318,12 @@ export default function CheckoutPage() {
     if (submitting) return;
 
     if (shop && !isShopOpen(shop)) {
-      setError('This shop is currently closed. Orders cannot be placed at this time.');
+      const reason = getShopClosedReason(shop);
+      setError(
+        reason
+          ? `Cannot place order because ${shop.name} is currently closed. ${reason}`
+          : `Cannot place order because ${shop.name} is currently closed.`
+      );
       return;
     }
 
@@ -1030,10 +1035,28 @@ export default function CheckoutPage() {
               </div>
             </div>
 
+            {shop && !isShopOpen(shop) && (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '0.5rem',
+                  padding: '0.85rem 1rem',
+                  marginTop: '1.25rem',
+                  fontSize: '0.85rem',
+                  color: '#b91c1c',
+                  fontWeight: '600',
+                  lineHeight: '1.4',
+                }}
+              >
+                🔒 <strong>{shop.name} is currently closed.</strong> {getShopClosedReason(shop) ? `Reason: ${getShopClosedReason(shop)}.` : 'Ordering is disabled until the shop reopens.'}
+              </div>
+            )}
+
             {/* Place Order Button */}
             <button
               onClick={handlePlaceOrder}
-              disabled={submitting || !selectedAddressId}
+              disabled={submitting || !selectedAddressId || (shop && !isShopOpen(shop))}
               className="btn-primary"
               style={{
                 width: '100%',
@@ -1042,10 +1065,16 @@ export default function CheckoutPage() {
                 fontWeight: '800',
                 marginTop: '1.5rem',
                 justifyContent: 'center',
-                opacity: submitting ? 0.7 : 1,
+                opacity: submitting || (shop && !isShopOpen(shop)) ? 0.7 : 1,
+                background: shop && !isShopOpen(shop) ? '#94a3b8' : undefined,
+                cursor: shop && !isShopOpen(shop) ? 'not-allowed' : 'pointer',
               }}
             >
-              {submitting ? 'Placing Order...' : 'Place Order Now'}
+              {submitting
+                ? 'Placing Order...'
+                : shop && !isShopOpen(shop)
+                ? 'Shop Closed - Cannot Order'
+                : 'Place Order Now'}
             </button>
           </div>
         </div>

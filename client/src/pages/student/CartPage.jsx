@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, ArrowRight, Store, AlertCircle, ShoppingBag, Clock, Lock } from 'lucide-react';
-import { isShopOpen, formatTimeAMPM } from '../../components/StudentUIComponents';
+import { isShopOpen, getShopClosedReason, formatTimeAMPM } from '../../components/StudentUIComponents';
 
 export default function CartPage() {
   const [cart, setCart] = useState(null);
@@ -169,9 +169,13 @@ export default function CartPage() {
               {shop?.name || 'This shop'} is currently closed
             </div>
             <div style={{ fontSize: '0.85rem', color: '#b91c1c', marginTop: '0.2rem' }}>
-              {shop?.openingTime && shop?.closingTime
-                ? `Normal business hours: ${formatTimeAMPM(shop.openingTime)} – ${formatTimeAMPM(shop.closingTime)}. You can browse cart items, but checkout is disabled until the shop reopens.`
-                : 'You can view your items, but checkout is disabled until the shop reopens.'}
+              {getShopClosedReason(shop) ? (
+                <><strong>Reason:</strong> {getShopClosedReason(shop)}. You can browse cart items, but checkout is disabled until the shop reopens.</>
+              ) : shop?.openingTime && shop?.closingTime ? (
+                `Normal business hours: ${formatTimeAMPM(shop.openingTime)} – ${formatTimeAMPM(shop.closingTime)}. You can browse cart items, but checkout is disabled until the shop reopens.`
+              ) : (
+                'You can view your items, but checkout is disabled until the shop reopens.'
+              )}
             </div>
           </div>
         </div>

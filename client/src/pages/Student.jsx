@@ -7,6 +7,8 @@ import {
   CategoryCard,
   ShopCard,
   LoadingSpinner,
+  isShopOpen,
+  ClosedShopModal,
 } from '../components/StudentUIComponents';
 import { Store, Compass, ArrowRight } from 'lucide-react';
 
@@ -25,6 +27,7 @@ export default function Student() {
   const [selectedCategory, setSelectedCategory] = useState(initialCat);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [closedModalShop, setClosedModalShop] = useState(null);
 
   // Sync state from URL parameters when URL changes (e.g. back/forward nav)
   useEffect(() => {
@@ -91,10 +94,23 @@ export default function Student() {
     }
   };
 
-  const handleShopClick = (shopId) => {
+  const handleShopClick = (shopItem) => {
+    if (!shopItem) return;
+    if (!isShopOpen(shopItem)) {
+      setClosedModalShop(shopItem);
+      return;
+    }
     const navUrl = selectedCategory
-      ? `/student/shops/${shopId}?category=${encodeURIComponent(selectedCategory)}`
-      : `/student/shops/${shopId}`;
+      ? `/student/shops/${shopItem._id}?category=${encodeURIComponent(selectedCategory)}`
+      : `/student/shops/${shopItem._id}`;
+    navigate(navUrl);
+  };
+
+  const handleBrowseClosedShop = (shopItem) => {
+    if (!shopItem) return;
+    const navUrl = selectedCategory
+      ? `/student/shops/${shopItem._id}?category=${encodeURIComponent(selectedCategory)}`
+      : `/student/shops/${shopItem._id}`;
     navigate(navUrl);
   };
 
@@ -241,12 +257,20 @@ export default function Student() {
               <ShopCard
                 key={shopItem._id}
                 shop={shopItem}
-                onClick={() => handleShopClick(shopItem._id)}
+                onClick={() => handleShopClick(shopItem)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Closed Shop Modal */}
+      <ClosedShopModal
+        shop={closedModalShop}
+        isOpen={Boolean(closedModalShop)}
+        onClose={() => setClosedModalShop(null)}
+        onBrowseMenu={() => handleBrowseClosedShop(closedModalShop)}
+      />
 
     </div>
   );
