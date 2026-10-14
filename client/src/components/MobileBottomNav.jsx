@@ -26,14 +26,49 @@ export default function MobileBottomNav() {
 
   return (
     <>
-      <nav className="bottom-nav-bar" aria-label="NearCart Navigation">
-        <div className="bottom-nav-inner">
+      <nav
+        className="bottom-nav-bar"
+        aria-label="NearCart Navigation"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div
+          className="bottom-nav-inner"
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'nowrap',
+            justifyContent: 'space-around',
+            alignItems: 'center',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
           <NavLink
             to="/"
             end
             className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
             title="Home"
             aria-label="Home"
+            style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             <div className="bottom-nav-icon-wrapper">
               <House size={19} strokeWidth={2} className="bottom-nav-icon" />
@@ -46,6 +81,14 @@ export default function MobileBottomNav() {
             className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
             title="Shop"
             aria-label="Shop"
+            style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             <div className="bottom-nav-icon-wrapper">
               <Store size={19} strokeWidth={2} className="bottom-nav-icon" />
@@ -58,6 +101,14 @@ export default function MobileBottomNav() {
             className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
             title="About NearCart"
             aria-label="About NearCart"
+            style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             <div className="bottom-nav-icon-wrapper">
               <Info size={19} strokeWidth={2} className="bottom-nav-icon" />
@@ -70,6 +121,14 @@ export default function MobileBottomNav() {
             className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
             title="Cart"
             aria-label="Cart"
+            style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             <div className="bottom-nav-icon-wrapper">
               <ShoppingCart size={19} strokeWidth={2} className="bottom-nav-icon" />
@@ -87,6 +146,14 @@ export default function MobileBottomNav() {
             className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
             title="Profile"
             aria-label="Profile"
+            style={{
+              flex: '1 1 0',
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             <div className="bottom-nav-icon-wrapper">
               <CircleUserRound size={19} strokeWidth={2} className="bottom-nav-icon" />
@@ -97,29 +164,21 @@ export default function MobileBottomNav() {
 
         <style>{`
           .bottom-nav-bar {
-            .bottom-nav-bar {
-  position: static;
-  width: 100%;
-  z-index: 1000;
-  background: #0f172a;
-  border-top: 1px solid rgba(13, 110, 253, 0.28);
-  box-shadow: 0 -4px 24px rgba(11, 31, 77, 0.35);
-  padding: 0.38rem 16px calc(0.38rem + env(safe-area-inset-bottom, 0px)) 16px;
-  box-sizing: border-box;
-}
-            bottom: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-            z-index: 1000;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            z-index: 1000 !important;
             background: #0f172a;
             border-top: 1px solid rgba(13, 110, 253, 0.28);
             box-shadow: 0 -4px 24px rgba(11, 31, 77, 0.35);
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: center !important;
+            align-items: center !important;
             padding: 0.38rem 16px calc(0.38rem + env(safe-area-inset-bottom, 0px)) 16px;
-            box-sizing: border-box;
+            box-sizing: border-box !important;
             --nav-icon-size: 19px;
             --nav-badge-size: 0.95rem;
             --nav-badge-font: 0.58rem;
@@ -127,21 +186,23 @@ export default function MobileBottomNav() {
             --nav-badge-right: -0.55rem;
           }
           .bottom-nav-inner {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            width: 100%;
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            justify-content: space-around !important;
+            align-items: center !important;
+            width: 100% !important;
             max-width: 820px;
             gap: 0.5rem;
-            box-sizing: border-box;
+            box-sizing: border-box !important;
           }
           .bottom-nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            flex: 1 1 0%;
-            min-width: 0;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
             gap: 0.22rem;
             background-color: #000000;
             color: #ffffff;
@@ -153,7 +214,7 @@ export default function MobileBottomNav() {
             transition: background-color 0.22s ease, border-color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease, color 0.22s ease;
             outline: none;
             cursor: pointer;
-            box-sizing: border-box;
+            box-sizing: border-box !important;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
           }
@@ -241,10 +302,10 @@ export default function MobileBottomNav() {
             border-color: #0D6EFD;
           }
 
-          /* ── Mobile Breakpoints (Preserves exact existing mobile layout) ── */
+          /* ── Mobile Breakpoints ── */
           @media (max-width: 640px) {
             .bottom-nav-bar {
-              padding: 0.35rem 12px calc(0.35rem + env(safe-area-inset-bottom, 0px)) 12px;
+              padding: 0.35rem 12px calc(0.35rem + env(safe-area-inset-bottom, 0px)) 12px !important;
             }
             .bottom-nav-inner {
               gap: 0.38rem;
@@ -259,7 +320,7 @@ export default function MobileBottomNav() {
           }
           @media (max-width: 480px) {
             .bottom-nav-bar {
-              padding: 0.32rem 8px calc(0.32rem + env(safe-area-inset-bottom, 0px)) 8px;
+              padding: 0.32rem 8px calc(0.32rem + env(safe-area-inset-bottom, 0px)) 8px !important;
             }
             .bottom-nav-inner {
               gap: 0.25rem;
@@ -275,7 +336,7 @@ export default function MobileBottomNav() {
           }
           @media (max-width: 360px) {
             .bottom-nav-bar {
-              padding: 0.28rem 4px calc(0.28rem + env(safe-area-inset-bottom, 0px)) 4px;
+              padding: 0.28rem 4px calc(0.28rem + env(safe-area-inset-bottom, 0px)) 4px !important;
             }
             .bottom-nav-inner {
               gap: 0.18rem;
@@ -293,7 +354,7 @@ export default function MobileBottomNav() {
           /* ── Tablet (768px - 1023px) ── */
           @media (min-width: 768px) {
             .bottom-nav-bar {
-              padding: 0.5rem 24px calc(0.5rem + env(safe-area-inset-bottom, 0px)) 24px;
+              padding: 0.5rem 24px calc(0.5rem + env(safe-area-inset-bottom, 0px)) 24px !important;
               --nav-icon-size: 21px;
               --nav-badge-size: 1.05rem;
               --nav-badge-font: 0.62rem;
@@ -318,7 +379,7 @@ export default function MobileBottomNav() {
           /* ── Small Laptop / Tablet Landscape (1024px - 1365px) ── */
           @media (min-width: 1024px) {
             .bottom-nav-bar {
-              padding: 0.55rem 32px;
+              padding: 0.55rem 32px !important;
               --nav-icon-size: 22px;
               --nav-badge-size: 1.1rem;
               --nav-badge-font: 0.64rem;
@@ -343,7 +404,7 @@ export default function MobileBottomNav() {
           /* ── Standard Laptop (1366px - 1439px) ── */
           @media (min-width: 1366px) {
             .bottom-nav-bar {
-              padding: 0.6rem 36px;
+              padding: 0.6rem 36px !important;
               --nav-icon-size: 23px;
               --nav-badge-size: 1.15rem;
               --nav-badge-font: 0.66rem;
@@ -368,7 +429,7 @@ export default function MobileBottomNav() {
           /* ── Desktop & Large Desktop (1440px - 1920px+) ── */
           @media (min-width: 1440px) {
             .bottom-nav-bar {
-              padding: 0.65rem 40px;
+              padding: 0.65rem 40px !important;
               --nav-icon-size: 24px;
               --nav-badge-size: 1.2rem;
               --nav-badge-font: 0.68rem;

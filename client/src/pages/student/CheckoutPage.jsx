@@ -28,14 +28,14 @@ export default function CheckoutPage() {
   const [locationDetecting, setLocationDetecting] = useState(false);
   const [locationMessage, setLocationMessage] = useState('');
   const [detectedLocalityInfo, setDetectedLocalityInfo] = useState(null);
-
+  const [pinningLocation, setPinningLocation] = useState(false);
+  const [pinLocationError, setPinLocationError] = useState('');
   // Automatic Delivery Estimation State
   const [calculatedDistanceInfo, setCalculatedDistanceInfo] = useState(null);
   const [estimatingDelivery, setEstimatingDelivery] = useState(false);
   const [estimateError, setEstimateError] = useState('');
 
   // Address Form Modal State
-
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [hostelsList, setHostelsList] = useState([]);
   const [addressFormData, setAddressFormData] = useState({
@@ -99,6 +99,94 @@ export default function CheckoutPage() {
     0
   );
 
+  const handlePinLocation = () => {
+    if (pinningLocation) return;
+    setPinLocationError('');
+
+    if (!navigator.geolocation) {
+      setPinLocationError('Geolocation is not supported by your browser. You can enter your address manually.');
+      return;
+    }
+
+    const isSecure =
+      window.isSecureContext ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    if (!isSecure) {
+      setPinLocationError('Geolocation requires a secure connection (HTTPS). Please access NearCart over HTTPS or enter your address manually.');
+      return;
+    }
+
+    setPinningLocation(true);
+
+    const onLocationSuccess = (position) => {
+      const lat = position?.coords?.latitude;
+      const lng = position?.coords?.longitude;
+
+      if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+        setAddressFormData((prev) => ({
+          ...prev,
+          latitude: parseFloat(lat.toFixed(7)),
+          longitude: parseFloat(lng.toFixed(7)),
+        }));
+        setPinLocationError('');
+      } else {
+        setPinLocationError('Could not obtain valid GPS coordinates. Please try again or enter your address manually.');
+      }
+      setPinningLocation(false);
+    };
+
+    const onLocationError = (err, isRetry = false) => {
+      if (err.code === 1 || err.code === err.PERMISSION_DENIED) {
+        setPinLocationError(
+          'Location permission was denied. To enable location access, please check your browser or site settings, grant location permissions, and click "Pin My Location" again.'
+        );
+        setPinningLocation(false);
+        return;
+      }
+
+      if (!isRetry && (err.code === 2 || err.code === 3 || err.code === err.POSITION_UNAVAILABLE || err.code === err.TIMEOUT)) {
+        navigator.geolocation.getCurrentPosition(
+          onLocationSuccess,
+          (retryErr) => onLocationError(retryErr, true),
+          {
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 60000,
+          }
+        );
+        return;
+      }
+
+      if (err.code === 2 || err.code === err.POSITION_UNAVAILABLE) {
+        setPinLocationError(
+          'Your location is currently unavailable. Please check your device GPS/location settings and try again, or enter your address manually.'
+        );
+      } else if (err.code === 3 || err.code === err.TIMEOUT) {
+        setPinLocationError(
+          'Location request timed out. Please check your network connection and try again, or enter your address manually.'
+        );
+      } else {
+        setPinLocationError(
+          `Unable to retrieve location (${err.message || 'Error'}). Please try again or enter your address manually.`
+        );
+      }
+
+      setPinningLocation(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      onLocationSuccess,
+      (err) => onLocationError(err, false),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
   const handleDetectLocality = async () => {
     setLocationDetecting(true);
     setLocationMessage('');
@@ -118,10 +206,16 @@ export default function CheckoutPage() {
           longitude: result.lng,
           isDefault: true,
         }));
+        setPinLocationError('');
         setShowAddressModal(true);
       }
     } catch (err) {
-      setLocationMessage(err.message || "Location access wasn't available. You can enter your address manually.");
+      const errMsg = err?.message || '';
+      if (errMsg.toLowerCase().includes('denied') || errMsg.toLowerCase().includes('permission')) {
+        setLocationMessage('Location permission was denied. You can enable location access in your browser settings and try again, or enter your address manually.');
+      } else {
+        setLocationMessage(errMsg || "Location access was not available. You can enter your address manually.");
+      }
     } finally {
       setLocationDetecting(false);
     }
@@ -1239,17 +1333,30 @@ export default function CheckoutPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
-                        navigator.geolocation.getCurrentPosition(
-                          (p) => setAddressFormData((prev) => ({ ...prev, latitude: parseFloat(p.coords.latitude.toFixed(7)), longitude: parseFloat(p.coords.longitude.toFixed(7)) })),
-                          (err) => alert('Location error: ' + err.message),
-                          { enableHighAccuracy: true, timeout: 10000 }
-                        );
+                      onClick={handlePinLocation}
+                      disabled={pinningLocation}
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.6rem',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '0.3rem',
+                        cursor: pinningLocation ? 'not-allowed' : 'pointer',
+                        color: 'var(--text-muted)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        opacity: pinningLocation ? 0.7 : 1,
                       }}
-                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.3rem', cursor: 'pointer', color: 'var(--text-muted)' }}
                     >
-                      Update
+                      {pinningLocation ? (
+                        <>
+                          <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        'Update'
+                      )}
                     </button>
                   </div>
                 ) : (
@@ -1259,25 +1366,69 @@ export default function CheckoutPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
-                        navigator.geolocation.getCurrentPosition(
-                          (p) => setAddressFormData((prev) => ({ ...prev, latitude: parseFloat(p.coords.latitude.toFixed(7)), longitude: parseFloat(p.coords.longitude.toFixed(7)) })),
-                          (err) => alert('Could not get location: ' + err.message),
-                          { enableHighAccuracy: true, timeout: 10000 }
-                        );
-                      }}
+                      onClick={handlePinLocation}
+                      disabled={pinningLocation}
                       className="btn-secondary"
-                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', border: '1px solid #cbd5e1', color: 'var(--text-primary)', fontWeight: '600' }}
+                      style={{
+                        fontSize: '0.8rem',
+                        padding: '0.35rem 0.75rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        color: 'var(--text-primary)',
+                        fontWeight: '600',
+                        cursor: pinningLocation ? 'not-allowed' : 'pointer',
+                        opacity: pinningLocation ? 0.7 : 1,
+                      }}
                     >
-                      <Compass size={14} /> 📍 Pin My Location
+                      {pinningLocation ? (
+                        <>
+                          <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Pinning Location...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Compass size={14} /> 📍 Pin My Location
+                        </>
+                      )}
                     </button>
+                  </div>
+                )}
+
+                {pinLocationError && (
+                  <div
+                    style={{
+                      marginTop: '0.65rem',
+                      padding: '0.55rem 0.75rem',
+                      background: '#fff1f2',
+                      border: '1px solid #fecdd3',
+                      borderRadius: '0.375rem',
+                      color: '#b91c1c',
+                      fontSize: '0.78rem',
+                      lineHeight: 1.45,
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '2px', color: '#e11d48' }} />
+                    <div style={{ flex: 1 }}>{pinLocationError}</div>
                   </div>
                 )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowAddressModal(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinLocationError('');
+                    setShowAddressModal(false);
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: '0.5rem 1rem' }}
+                >
                   Cancel
                 </button>
                 <button

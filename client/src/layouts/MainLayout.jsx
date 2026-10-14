@@ -25,7 +25,7 @@ import {
 import NearCartLogo from '../components/NearCartLogo';
 import PwaInstallButton from '../components/PwaInstallButton';
 import PwaInstallBanner from '../components/PwaInstallBanner';
-import Footer from '../components/Footer';
+import MobileBottomNav from '../components/MobileBottomNav';
 import { registerPwaInstallation } from '../utils/pwaInstallTracker';
 import AutoReviewPopup from '../components/AutoReviewPopup';
 
@@ -673,7 +673,7 @@ export default function MainLayout() {
       `}</style>
 
       {/* Main Outlet with bottom clearance for fixed navigation */}
-      <main className="main-content-layout" style={{ flex: 1 }}>
+      <main className="main-content-layout" style={{ flex: 1, paddingBottom: '4rem' }}>
         <Outlet />
       </main>
 
@@ -683,7 +683,7 @@ export default function MainLayout() {
       {isAuthenticated && user?.role === 'STUDENT' && <AutoReviewPopup />}
 
       {/* Fixed Bottom Navigation Bar (Home, Shop, About, Cart, Profile) */}
-      <Footer />
+      <MobileBottomNav />
     </div>
   );
 }
