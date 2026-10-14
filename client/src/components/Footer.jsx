@@ -1,434 +1,229 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import NearCartLogo from './NearCartLogo';
-import {
-  ShieldCheck,
-  Lock,
-  Instagram,
-  Linkedin,
-  Github,
-  Youtube,
-  Twitter,
-  ExternalLink,
-  Heart,
-} from 'lucide-react';
-
-/**
- * Centralized Social Links Configuration
- * Populate valid URLs to display official social media buttons with hover tooltips and accessibility labels.
- * Unconfigured / empty URLs are safely omitted to avoid fake/broken external links.
- */
-export const SOCIAL_LINKS_CONFIG = [
-  {
-    id: 'instagram',
-    name: 'Instagram',
-    url: import.meta.env.VITE_SOCIAL_INSTAGRAM || 'https://instagram.com/nearcart',
-    icon: Instagram,
-    ariaLabel: 'NearCart on Instagram',
-  },
-  {
-    id: 'linkedin',
-    name: 'LinkedIn',
-    url: import.meta.env.VITE_SOCIAL_LINKEDIN || 'https://linkedin.com/company/nearcart',
-    icon: Linkedin,
-    ariaLabel: 'NearCart on LinkedIn',
-  },
-  {
-    id: 'github',
-    name: 'GitHub',
-    url: import.meta.env.VITE_SOCIAL_GITHUB || 'https://github.com/nearcart',
-    icon: Github,
-    ariaLabel: 'NearCart on GitHub',
-  },
-  {
-    id: 'youtube',
-    name: 'YouTube',
-    url: import.meta.env.VITE_SOCIAL_YOUTUBE || 'https://youtube.com/@nearcart',
-    icon: Youtube,
-    ariaLabel: 'NearCart on YouTube',
-  },
-  {
-    id: 'twitter',
-    name: 'X (Twitter)',
-    url: import.meta.env.VITE_SOCIAL_TWITTER || 'https://x.com/nearcart',
-    icon: Twitter,
-    ariaLabel: 'NearCart on X (Twitter)',
-  },
-];
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { House, Store, Info, ShoppingCart, CircleUserRound } from 'lucide-react';
+import api from '../services/api';
 
 export default function Footer() {
-  const currentYear = new Date().getFullYear();
+  const { user, isAuthenticated } = useAuth();
+  const [cartCount, setCartCount] = React.useState(0);
 
-  // Filter only configured social links with valid URLs
-  const activeSocialLinks = SOCIAL_LINKS_CONFIG.filter(
-    (item) => item.url && typeof item.url === 'string' && item.url.trim() !== ''
-  );
+  // Fetch live cart item count for students
+  React.useEffect(() => {
+    if (isAuthenticated && user?.role === 'STUDENT') {
+      api.get('/cart')
+        .then((res) => {
+          if (res && res.success && res.data && res.data.items) {
+            const count = res.data.items.reduce((acc, item) => acc + (item.quantity || 1), 0);
+            setCartCount(count);
+          }
+        })
+        .catch(() => setCartCount(0));
+    } else {
+      setCartCount(0);
+    }
+  }, [isAuthenticated, user?.role]);
 
   return (
-    <>
-    <footer
-      className="main-footer"
-      style={{
-        background: '#0f172a',
-        color: '#f8fafc',
-        borderTop: '1px solid rgba(2, 132, 199, 0.3)',
-        position: 'relative',
-        marginTop: 'auto',
-      }}
-    >
-      {/* Top Gradient Accent Line */}
-      <div
-        style={{
-          height: '3px',
-          width: '100%',
-          background: 'linear-gradient(90deg, #38bdf8 0%, #0284c7 50%, #1e3a8a 100%)',
-        }}
-      />
+    <nav className="footer-bar" aria-label="NearCart Navigation">
+      <div className="footer-inner">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) => `footer-item ${isActive ? 'active' : ''}`}
+          title="Home"
+          aria-label="Home"
+        >
+          <div className="footer-icon-wrapper">
+            <House size={19} strokeWidth={2} className="footer-icon" />
+          </div>
+          <span className="footer-label">Home</span>
+        </NavLink>
 
-      <div className="footer-container">
-        {/* Main Footer Grid */}
-        <div className="footer-grid">
-          {/* Column 1: Brand & Tagline */}
-          <div className="footer-col-brand">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
-              <NearCartLogo size="small" variant="dark" />
-            </div>
+        <NavLink
+          to="/student"
+          className={({ isActive }) => `footer-item ${isActive ? 'active' : ''}`}
+          title="Shop"
+          aria-label="Shop"
+        >
+          <div className="footer-icon-wrapper">
+            <Store size={19} strokeWidth={2} className="footer-icon" />
+          </div>
+          <span className="footer-label">Shop</span>
+        </NavLink>
 
-            <p className="footer-brand-tagline" style={{ fontSize: '0.78rem', fontWeight: '700', color: '#38bdf8', margin: '0 0 0.2rem 0' }}>
-              "Your nearby shops, delivered."
-            </p>
+        <NavLink
+          to="/about"
+          className={({ isActive }) => `footer-item ${isActive ? 'active' : ''}`}
+          title="About NearCart"
+          aria-label="About NearCart"
+        >
+          <div className="footer-icon-wrapper">
+            <Info size={19} strokeWidth={2} className="footer-icon" />
+          </div>
+          <span className="footer-label">About</span>
+        </NavLink>
 
-            <p className="footer-brand-desc" style={{ fontSize: '0.74rem', color: '#94a3b8', lineHeight: '1.35', margin: '0 0 0.4rem 0' }}>
-              NearCart connects customers with nearby local shops for fast, convenient, and reliable ordering & delivery straight to your doorstep.
-            </p>
-
-            {/* Social Links Section */}
-            {activeSocialLinks.length > 0 && (
-              <div>
-                <div style={{ fontSize: '0.65rem', fontWeight: '700', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>
-                  Connect With Us
-                </div>
-                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                  {activeSocialLinks.map((social) => {
-                    const IconComp = social.icon;
-                    return (
-                      <a
-                        key={social.id}
-                        href={social.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={social.ariaLabel}
-                        title={social.name}
-                        className="social-icon-btn"
-                      >
-                        <IconComp size={13} />
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
+        <NavLink
+          to="/cart"
+          className={({ isActive }) => `footer-item ${isActive ? 'active' : ''}`}
+          title="Cart"
+          aria-label="Cart"
+        >
+          <div className="footer-icon-wrapper">
+            <ShoppingCart size={19} strokeWidth={2} className="footer-icon" />
+            {cartCount > 0 && (
+              <span className="footer-cart-badge" aria-live="polite">
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
             )}
           </div>
+          <span className="footer-label">Cart</span>
+        </NavLink>
 
-          {/* Column 2: Quick Navigation */}
-          <div className="footer-col-quicklinks">
-            <h4 className="footer-heading">
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
-              Quick Links
-            </h4>
-            <ul className="footer-links-list">
-              <li>
-                <Link to="/" className="footer-link">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link to="/student" className="footer-link">
-                  Customer Marketplace
-                </Link>
-              </li>
-              <li>
-                <Link to="/orders" className="footer-link">
-                  My Orders
-                </Link>
-              </li>
-              <li>
-                <Link to="/cart" className="footer-link">
-                  Shopping Cart
-                </Link>
-              </li>
-              <li>
-                <Link to="/notifications" className="footer-link">
-                  Notifications
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="footer-link">
-                  About NearCart
-                </Link>
-              </li>
-            </ul>
+        <NavLink
+          to="/profile"
+          className={({ isActive }) => `footer-item ${isActive ? 'active' : ''}`}
+          title="Profile"
+          aria-label="Profile"
+        >
+          <div className="footer-icon-wrapper">
+            <CircleUserRound size={19} strokeWidth={2} className="footer-icon" />
           </div>
-
-          {/* Column 3: Platform Portals */}
-          <div className="footer-col-portals">
-            <h4 className="footer-heading">
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#0284c7', display: 'inline-block' }} />
-              Platform Portals
-            </h4>
-            <ul className="footer-links-list">
-              <li>
-                <Link to="/student" className="footer-link">
-                  Customer Marketplace
-                </Link>
-              </li>
-              <li>
-                <Link to="/shopkeeper" className="footer-link">
-                  Shop Partner Portal
-                </Link>
-              </li>
-              <li>
-                <Link to="/delivery" className="footer-link">
-                  Delivery Partner Hub
-                </Link>
-              </li>
-              <li>
-                <Link to="/admin" className="footer-link">
-                  Admin Governance
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Privacy & Safety Trust Section */}
-          <div className="footer-col-trust">
-            <div className="footer-trust-box">
-              <h4
-                className="footer-heading"
-                style={{
-                  color: '#38bdf8',
-                  margin: '0 0 0.25rem 0',
-                }}
-              >
-                <ShieldCheck size={14} style={{ color: '#38bdf8', flexShrink: 0 }} />
-                Privacy & Safety
-              </h4>
-
-              <p className="footer-trust-text" style={{ fontSize: '0.73rem', color: '#cbd5e1', lineHeight: '1.3', margin: '0 0 0.25rem 0' }}>
-                Your privacy matters to us. NearCart only uses data needed to process your orders.
-              </p>
-
-              <div
-                style={{
-                  fontSize: '0.68rem',
-                  color: '#94a3b8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  marginTop: '0.25rem',
-                  paddingTop: '0.25rem',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                }}
-              >
-                <Lock size={11} style={{ color: '#38bdf8', flexShrink: 0 }} />
-                <span>Secure account protection enabled.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Copyright Row */}
-        <div className="footer-bottom-row">
-          <div>
-            © {currentYear} NearCart. All rights reserved.
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#94a3b8' }}>
-            <ShieldCheck size={12} style={{ color: '#38bdf8' }} />
-            <span>Secure & Private Local Ordering</span>
-          </div>
-        </div>
+          <span className="footer-label">Profile</span>
+        </NavLink>
       </div>
-
-      {/* Footer Scoped Hover & Responsive Styles */}
       <style>{`
-        .footer-container {
-          padding: 1.25rem 1.25rem 0.85rem 1.25rem;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-        .footer-grid {
-          display: grid;
-          grid-template-columns: 1.3fr 1fr 1fr 1.1fr;
-          gap: 1.25rem;
-          margin-bottom: 0.85rem;
-        }
-        .footer-heading {
-          font-size: 0.8rem;
-          font-weight: 800;
-          color: #ffffff;
-          margin-bottom: 0.45rem;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
+        .footer-bar {
+          width: 100%;
+          background: #0f172a;
+          border-top: 1px solid rgba(13, 110, 253, 0.28);
+          box-shadow: 0 -4px 24px rgba(11, 31, 77, 0.35);
           display: flex;
+          justify-content: center;
           align-items: center;
-          gap: 0.35rem;
+          padding: 0.38rem 16px calc(0.38rem + env(safe-area-inset-bottom, 0px)) 16px;
+          box-sizing: border-box;
+          --nav-icon-size: 19px;
+          --nav-badge-size: 0.95rem;
+          --nav-badge-font: 0.58rem;
+          --nav-badge-top: -0.34rem;
+          --nav-badge-right: -0.55rem;
         }
-        .footer-links-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
+        .footer-inner {
+          display: flex;
+          justify-content: space-around;
+          align-items: center;
+          width: 100%;
+          max-width: 820px;
+          gap: 0.5rem;
+          box-sizing: border-box;
+        }
+        .footer-item {
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
-          font-size: 0.78rem;
-        }
-        .footer-link {
-          color: #94a3b8;
+          align-items: center;
+          justify-content: center;
+          flex: 1 1 0%;
+          min-width: 0;
+          gap: 0.22rem;
+          background-color: #000000;
+          color: #ffffff;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          border-radius: 0.75rem;
           text-decoration: none;
-          transition: color 0.2s ease, transform 0.2s ease;
-          display: inline-block;
-          word-break: break-word;
-        }
-        .footer-link:hover, .footer-link:focus-visible {
-          color: #38bdf8 !important;
-          transform: translateX(3px);
+          padding: 0.48rem 0.5rem;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+          transition: background-color 0.22s ease, border-color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease, color 0.22s ease;
           outline: none;
+          cursor: pointer;
+          box-sizing: border-box;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
         }
-        .social-icon-btn {
-          width: 1.85rem;
-          height: 1.85rem;
-          border-radius: 50%;
-          background: #000000 !important;
-          border: 1px solid rgba(255, 255, 255, 0.2);
+        .footer-icon-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; color: #ffffff; }
+        .footer-icon { width: var(--nav-icon-size) !important; height: var(--nav-icon-size) !important; color: #ffffff; flex-shrink: 0; transition: transform 0.22s ease, color 0.22s ease; }
+        .footer-label { font-size: 0.7rem; font-weight: 600; color: #ffffff; line-height: 1.15; letter-spacing: 0.01em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; transition: color 0.22s ease; }
+        .footer-item:hover { background-color: #0D6EFD !important; border-color: #0D6EFD !important; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(13, 110, 253, 0.45); }
+        .footer-item:hover .footer-icon, .footer-item:hover .footer-label { color: #ffffff !important; }
+        .footer-item:hover .footer-icon { transform: scale(1.08); }
+        .footer-item.active { background-color: #0D6EFD !important; border-color: #0D6EFD !important; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(13, 110, 253, 0.45); }
+        .footer-item.active .footer-icon { color: #ffffff !important; transform: scale(1.05); }
+        .footer-item.active .footer-label { font-weight: 700; color: #ffffff !important; }
+        .footer-item:focus-visible { outline: 2px solid #0D6EFD; outline-offset: 2px; }
+        .footer-cart-badge {
+          position: absolute;
+          top: var(--nav-badge-top);
+          right: var(--nav-badge-right);
+          background: #ef4444;
+          color: #ffffff;
+          font-size: var(--nav-badge-font);
+          font-weight: 800;
+          border-radius: 9999px;
+          padding: 0.08rem 0.28rem;
+          min-width: var(--nav-badge-size);
+          height: var(--nav-badge-size);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #ffffff !important;
-          text-decoration: none;
-          transition: background-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+          line-height: 1;
+          box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+          border: 1.5px solid #000000;
+          pointer-events: none;
+          transition: border-color 0.22s ease;
         }
-        .social-icon-btn:hover {
-          background: #0D6EFD !important;
-          color: #ffffff !important;
-          border-color: #0D6EFD !important;
-          transform: translateY(-2px) scale(1.08);
-          box-shadow: 0 4px 14px rgba(13, 110, 253, 0.45);
-        }
-        .social-icon-btn:active,
-        .social-icon-btn.active {
-          background: #0D6EFD !important;
-          color: #ffffff !important;
-          border-color: #0D6EFD !important;
-          transform: translateY(0) scale(1.02);
-          box-shadow: 0 2px 8px rgba(13, 110, 253, 0.35);
-        }
-        .social-icon-btn:focus-visible {
-          background: #0D6EFD !important;
-          color: #ffffff !important;
-          outline: 2px solid #0D6EFD;
-          outline-offset: 2px;
-        }
-        .footer-trust-box {
-          background: rgba(56, 189, 248, 0.05);
-          border: 1px solid rgba(56, 189, 248, 0.2);
-          border-radius: 0.5rem;
-          padding: 0.65rem 0.85rem;
-        }
-        .footer-bottom-row {
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-          padding-top: 0.65rem;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 0.4rem;
-          font-size: 0.75rem;
-          color: #64748b;
-        }
-
-        /* Tablet Screens (641px to 1024px) */
-        @media (max-width: 1024px) {
-          .footer-container {
-            padding: 1rem 1rem 0.75rem 1rem;
-          }
-          .footer-grid {
-            grid-template-columns: 1.2fr 1fr 1fr 1.1fr;
-            gap: 1rem;
-            margin-bottom: 0.75rem;
-          }
-        }
-
-        /* Mobile Screens (<= 640px) */
+        .footer-item.active .footer-cart-badge,
+        .footer-item:hover .footer-cart-badge { border-color: #0D6EFD; }
+        /* Mobile breakpoints */
         @media (max-width: 640px) {
-          .footer-container {
-            padding: 0.75rem 0.85rem 0.5rem 0.85rem !important;
-          }
-          .footer-grid {
-            grid-template-columns: 1fr 1fr !important;
-            gap: 0.65rem 0.75rem !important;
-            margin-bottom: 0.5rem !important;
-          }
-          .footer-col-brand {
-            grid-column: 1 / -1 !important;
-          }
-          .footer-col-quicklinks {
-            grid-column: 1 !important;
-          }
-          .footer-col-portals {
-            grid-column: 2 !important;
-          }
-          .footer-col-trust {
-            grid-column: 1 / -1 !important;
-          }
-          .footer-heading {
-            font-size: 0.72rem !important;
-            margin-bottom: 0.3rem !important;
-          }
-          .footer-links-list {
-            gap: 0.18rem !important;
-            font-size: 0.72rem !important;
-          }
-          .footer-brand-tagline {
-            font-size: 0.72rem !important;
-            margin-bottom: 0.15rem !important;
-          }
-          .footer-brand-desc {
-            font-size: 0.7rem !important;
-            line-height: 1.3 !important;
-            margin-bottom: 0.35rem !important;
-          }
-          .footer-trust-box {
-            padding: 0.5rem 0.65rem !important;
-          }
-          .footer-trust-text {
-            font-size: 0.68rem !important;
-            line-height: 1.25 !important;
-          }
-          .social-icon-btn {
-            width: 1.55rem !important;
-            height: 1.55rem !important;
-          }
-          .footer-bottom-row {
-            font-size: 0.68rem !important;
-            padding-top: 0.4rem !important;
-          }
+          .footer-bar { padding: 0.35rem 12px calc(0.35rem + env(safe-area-inset-bottom, 0px)) 12px; }
+          .footer-inner { gap: 0.38rem; }
+          .footer-item { padding: 0.42rem 0.35rem; border-radius: 0.7rem; }
+          .footer-label { font-size: 0.66rem; }
         }
-
-        /* Very Small Mobile Screens (<= 360px) */
+        @media (max-width: 480px) {
+          .footer-bar { padding: 0.32rem 8px calc(0.32rem + env(safe-area-inset-bottom, 0px)) 8px; }
+          .footer-inner { gap: 0.25rem; }
+          .footer-item { padding: 0.38rem 0.25rem; border-radius: 0.65rem; gap: 0.18rem; }
+          .footer-label { font-size: 0.62rem; }
+        }
         @media (max-width: 360px) {
-          .footer-container {
-            padding: 0.65rem 0.65rem 0.4rem 0.65rem !important;
-          }
-          .footer-grid {
-            gap: 0.5rem 0.5rem !important;
-          }
-          .footer-links-list {
-            font-size: 0.7rem !important;
-          }
+          .footer-bar { padding: 0.28rem 4px calc(0.28rem + env(safe-area-inset-bottom, 0px)) 4px; }
+          .footer-inner { gap: 0.18rem; }
+          .footer-item { padding: 0.32rem 0.18rem; border-radius: 0.55rem; gap: 0.15rem; }
+          .footer-label { font-size: 0.58rem; }
+        }
+        /* Larger breakpoints – reuse scaling from MobileBottomNav */
+        @media (min-width: 768px) {
+          .footer-bar { padding: 0.5rem 24px calc(0.5rem + env(safe-area-inset-bottom, 0px)) 24px; --nav-icon-size: 21px; --nav-badge-size: 1.05rem; --nav-badge-font: 0.62rem; --nav-badge-top: -0.36rem; --nav-badge-right: -0.6rem; }
+          .footer-inner { max-width: 720px; gap: 0.75rem; }
+          .footer-item { padding: 0.55rem 0.75rem; border-radius: 0.85rem; gap: 0.28rem; }
+          .footer-label { font-size: 0.78rem; letter-spacing: 0.015em; }
+        }
+        @media (min-width: 1024px) {
+          .footer-bar { padding: 0.55rem 32px; --nav-icon-size: 22px; --nav-badge-size: 1.1rem; --nav-badge-font: 0.64rem; --nav-badge-top: -0.38rem; --nav-badge-right: -0.62rem; }
+          .footer-inner { max-width: 820px; gap: 0.95rem; }
+          .footer-item { padding: 0.58rem 0.95rem; border-radius: 0.9rem; gap: 0.32rem; }
+          .footer-label { font-size: 0.82rem; letter-spacing: 0.02em; }
+        }
+        @media (min-width: 1366px) {
+          .footer-bar { padding: 0.6rem 36px; --nav-icon-size: 23px; --nav-badge-size: 1.15rem; --nav-badge-font: 0.66rem; --nav-badge-top: -0.4rem; --nav-badge-right: -0.65rem; }
+          .footer-inner { max-width: 900px; gap: 1.15rem; }
+          .footer-item { padding: 0.62rem 1.05rem; border-radius: 0.95rem; gap: 0.35rem; }
+          .footer-label { font-size: 0.85rem; letter-spacing: 0.02em; }
+        }
+        @media (min-width: 1440px) {
+          .footer-bar { padding: 0.65rem 40px; --nav-icon-size: 24px; --nav-badge-size: 1.2rem; --nav-badge-font: 0.68rem; --nav-badge-top: -0.42rem; --nav-badge-right: -0.68rem; }
+          .footer-inner { max-width: 960px; gap: 1.35rem; }
+          .footer-item { padding: 0.65rem 1.2rem; border-radius: 1rem; gap: 0.38rem; }
+          .footer-label { font-size: 0.88rem; letter-spacing: 0.02em; }
+        }
+        @media (min-width: 1920px) {
+          .footer-inner { max-width: 1020px; gap: 1.5rem; }
+          .footer-item { padding: 0.7rem 1.3rem; border-radius: 1.05rem; gap: 0.4rem; }
+          .footer-label { font-size: 0.9rem; }
         }
       `}</style>
-    </footer>
-    </>
+    </nav>
   );
 }

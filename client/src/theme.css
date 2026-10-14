@@ -366,15 +366,10 @@ html {
 }
 
 /* ──────────────────────────────────────────────────
-   FOOTER — ALWAYS VISIBLE, RESPONSIVE
+   PAGE CLEARANCE FOR FIXED BOTTOM NAVIGATION BAR
    ────────────────────────────────────────────────── */
-
-/* On mobile the footer renders above the fixed bottom nav.
-   We add padding-bottom to the footer so it doesn't hide under the nav. */
-@media (max-width: 768px) {
-  .main-footer {
-    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important;
-  }
+.main-content-layout {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* ──────────────────────────────────────────────────

@@ -22,7 +22,6 @@ import {
   UserPlus,
   LayoutDashboard
 } from 'lucide-react';
-import MobileBottomNav from '../components/MobileBottomNav';
 import NearCartLogo from '../components/NearCartLogo';
 import PwaInstallButton from '../components/PwaInstallButton';
 import PwaInstallBanner from '../components/PwaInstallBanner';
@@ -673,20 +672,17 @@ export default function MainLayout() {
         }
       `}</style>
 
-      {/* Main Outlet */}
-      <main style={{ flex: 1 }}>
+      {/* Main Outlet with bottom clearance for fixed navigation */}
+      <main className="main-content-layout" style={{ flex: 1 }}>
         <Outlet />
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav />
 
       <PwaInstallBanner />
 
       {/* Auto Review Popup for Delivered Orders */}
       {isAuthenticated && user?.role === 'STUDENT' && <AutoReviewPopup />}
 
-      {/* Footer */}
+      {/* Fixed Bottom Navigation Bar (Home, Shop, About, Cart, Profile) */}
       <Footer />
     </div>
   );
