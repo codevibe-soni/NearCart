@@ -4,10 +4,10 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { detectUserLocality } from '../../utils/locationService';
 import { isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
-import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2, Lock } from 'lucide-react';
+import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2, Lock, Phone } from 'lucide-react';
 
 export default function CheckoutPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const location = useLocation();
   const buyNowItem = location.state?.buyNowItem || null;
 
@@ -23,6 +23,13 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Mobile number requirement state
+  const userPhone = user?.phone ? user.phone.trim().replace(/[\s\-\.\(\)]/g, '').replace(/^(\+91|91|0)/, '') : '';
+  const hasValidPhone = Boolean(userPhone && /^[6-9]\d{9}$/.test(userPhone));
+  const [checkoutPhoneInput, setCheckoutPhoneInput] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneSaveError, setPhoneSaveError] = useState('');
 
   // Location Detection State
   const [locationDetecting, setLocationDetecting] = useState(false);
@@ -408,8 +415,44 @@ export default function CheckoutPage() {
     fetchDeliveryEstimate();
   }, [selectedAddressId, shop]);
 
+  const handleSavePhoneFromCheckout = async (e) => {
+    if (e) e.preventDefault();
+    setPhoneSaveError('');
+
+    const clean = checkoutPhoneInput.trim().replace(/[\s\-\.\(\)]/g, '').replace(/^(\+91|91|0)/, '');
+    if (!clean || !/^[6-9]\d{9}$/.test(clean)) {
+      setPhoneSaveError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
+      return;
+    }
+
+    try {
+      setSavingPhone(true);
+      const res = await api.put('/auth/profile', { phone: clean });
+      if (res && res.success) {
+        if (refreshUser) await refreshUser();
+        setError('');
+      } else {
+        setPhoneSaveError(res?.message || 'Failed to save mobile number.');
+      }
+    } catch (err) {
+      setPhoneSaveError(err.message || 'Failed to save mobile number.');
+    } finally {
+      setSavingPhone(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (submitting) return;
+
+    if (!hasValidPhone) {
+      setError('Please add your mobile number before placing your order.');
+      const phoneInputEl = document.getElementById('checkout-phone-input');
+      if (phoneInputEl) {
+        phoneInputEl.focus();
+        phoneInputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
 
     if (shop && !isShopOpen(shop)) {
       const reason = getShopClosedReason(shop);
@@ -555,6 +598,155 @@ export default function CheckoutPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }} className="checkout-grid grid-responsive-2">
         {/* Left Column: Address & Payment */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+          {/* Contact Mobile Number Section */}
+          {!hasValidPhone ? (
+            <div
+              style={{
+                background: 'var(--surface)',
+                borderRadius: '0.75rem',
+                border: '1.5px solid #0D6EFD',
+                padding: '1.25rem 1.5rem',
+                boxShadow: '0 4px 14px rgba(13, 110, 253, 0.1)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.65rem' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: 'rgba(13, 110, 253, 0.12)',
+                  color: '#0D6EFD',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Phone size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                    Mobile Number Required
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Please add your mobile number for delivery updates before placing this order.
+                  </p>
+                </div>
+              </div>
+
+              {phoneSaveError && (
+                <div style={{
+                  padding: '0.6rem 0.85rem',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.4rem',
+                  color: '#b91c1c',
+                  fontSize: '0.825rem',
+                  marginBottom: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>{phoneSaveError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSavePhoneFromCheckout} style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '0.5rem',
+                  background: '#ffffff',
+                  overflow: 'hidden',
+                  flex: 1,
+                  minWidth: '220px',
+                }}>
+                  <span style={{
+                    padding: '0.55rem 0.75rem',
+                    background: '#f8fafc',
+                    borderRight: '1px solid #cbd5e1',
+                    fontSize: '0.875rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                  }}>
+                    +91
+                  </span>
+                  <input
+                    id="checkout-phone-input"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="Enter 10-digit mobile number"
+                    value={checkoutPhoneInput}
+                    onChange={(e) => {
+                      setCheckoutPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10));
+                      if (phoneSaveError) setPhoneSaveError('');
+                    }}
+                    style={{
+                      border: 'none',
+                      outline: 'none',
+                      padding: '0.55rem 0.75rem',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      width: '100%',
+                    }}
+                    autoFocus
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingPhone || checkoutPhoneInput.length !== 10}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.55rem 1.25rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    opacity: savingPhone || checkoutPhoneInput.length !== 10 ? 0.6 : 1,
+                    cursor: savingPhone || checkoutPhoneInput.length !== 10 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {savingPhone ? 'Saving...' : 'Save Number'}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div
+              style={{
+                background: 'var(--surface)',
+                borderRadius: '0.75rem',
+                border: '1px solid var(--border-color)',
+                padding: '0.85rem 1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <Phone size={17} style={{ color: 'var(--primary)' }} />
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Contact Mobile: </span>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>+91 {userPhone}</span>
+                </div>
+              </div>
+              <Link
+                to="/profile"
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--primary)',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                Edit in Profile
+              </Link>
+            </div>
+          )}
 
           {/* 1. Delivery Address Section */}
           <div style={{
@@ -1166,6 +1358,8 @@ export default function CheckoutPage() {
             >
               {submitting
                 ? 'Placing Order...'
+                : !hasValidPhone
+                ? 'Add Mobile Number to Place Order'
                 : shop && !isShopOpen(shop)
                 ? 'Shop Closed - Cannot Order'
                 : 'Place Order Now'}

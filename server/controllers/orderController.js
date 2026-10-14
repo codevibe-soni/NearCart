@@ -163,6 +163,20 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // Mandatory mobile number check: fetch saved phone number from authenticated user in database
+    const freshUser = await User.findById(req.user._id).select('phone');
+    const rawPhone = freshUser?.phone ? freshUser.phone.trim() : '';
+    const cleanPhone = rawPhone.replace(/[\s\-\.\(\)]/g, '').replace(/^(\+91|91|0)/, '');
+    const isValidPhone = /^[6-9]\d{9}$/.test(cleanPhone);
+
+    if (!freshUser || !rawPhone || !isValidPhone) {
+      return res.status(400).json({
+        success: false,
+        code: 'PHONE_REQUIRED',
+        message: 'Please add your mobile number before placing your order.',
+      });
+    }
+
     if (!['COD', 'UPI', 'ONLINE'].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
@@ -468,6 +482,7 @@ const totalAmount = Math.max(
       order = await Order.create({
         orderNumber,
         user: req.user._id,
+        customerPhone: cleanPhone,
         shop: shop._id,
         items: orderItems,
         address: address._id,
@@ -677,7 +692,7 @@ try {
   customer: {
     _id: req.user._id,
     name: req.user.name,
-    phone: req.user.phone,
+    phone: cleanPhone || req.user.phone || '',
   },
   // Delivery address
   address: address,
@@ -841,7 +856,7 @@ try {
         shopAddress: shopDoc.address || '',
         shopUpiId: shopDoc.upiId || order.upiQrSnapshot?.upiId || '',
         studentName: req.user.name || 'Customer',
-        customerPhone: req.user.phone || 'Not provided',
+        customerPhone: cleanPhone || req.user.phone || 'Not provided',
         customerEmail: req.user.email || 'Not provided',
         orderNumber: order.orderNumber,
         orderId: order._id,
@@ -934,6 +949,7 @@ export const getStudentOrders = async (req, res) => {
 export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
+      .populate('user', 'name email phone')
       .populate('shop','name bannerImage address deliveryFee upiEnabled upiId upiQrImage')
       .populate('address')
       .populate('items.product', 'name images unit');

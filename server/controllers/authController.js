@@ -492,7 +492,16 @@ export const updateProfile = async (req, res, next) => {
     }
 
     if (name) user.name = name.trim();
-    if (phone) user.phone = phone.trim();
+    if (phone !== undefined) {
+      const clean = phone.trim().replace(/[\s\-\.\(\)]/g, '').replace(/^(\+91|91|0)/, '');
+      if (clean && !/^[6-9]\d{9}$/.test(clean)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please enter a valid 10-digit mobile number.',
+        });
+      }
+      user.phone = clean;
+    }
     if (profileImage !== undefined) user.profileImage = profileImage;
     if (req.body.isOnline !== undefined) user.isOnline = Boolean(req.body.isOnline);
     if (customerType && ['STUDENT', 'ATITHI'].includes(customerType.toUpperCase())) {

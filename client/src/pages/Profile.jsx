@@ -11,16 +11,23 @@ export default function Profile() {
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState(user?.phone && user?.phone !== '0000000000' ? user.phone : '');
   const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
 
   const handleSavePhone = async (e) => {
     e.preventDefault();
+    setPhoneError('');
+    const clean = phoneInput.trim().replace(/[\s\-\.\(\)]/g, '').replace(/^(\+91|91|0)/, '');
+    if (!clean || !/^[6-9]\d{9}$/.test(clean)) {
+      setPhoneError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
+      return;
+    }
     setSavingPhone(true);
     try {
-      await api.put('/auth/profile', { phone: phoneInput.trim() });
+      await api.put('/auth/profile', { phone: clean });
       await refreshUser();
       setIsEditingPhone(false);
     } catch (err) {
-      console.error('Failed to update phone number:', err);
+      setPhoneError(err.message || 'Failed to update phone number.');
     } finally {
       setSavingPhone(false);
     }
@@ -180,59 +187,75 @@ export default function Profile() {
               <Phone size={24} />
             </div>
             <div>
-              <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 0.25rem 0' }}>Phone Number</p>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 0.25rem 0' }}>Mobile Number</p>
               {isEditingPhone ? (
-                <form onSubmit={handleSavePhone} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <input
-                    type="tel"
-                    value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
-                    placeholder="Enter 10-digit number"
-                    style={{
-                      padding: '0.35rem 0.6rem',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.9rem',
-                      outline: 'none',
-                    }}
-                    required
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    disabled={savingPhone}
-                    style={{
-                      padding: '0.35rem 0.75rem',
-                      background: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {savingPhone ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingPhone(false);
-                      setPhoneInput(user?.phone && user?.phone !== '0000000000' ? user.phone : '');
-                    }}
-                    style={{
-                      padding: '0.35rem 0.6rem',
-                      background: '#f1f5f9',
-                      color: '#64748b',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </form>
+                <div>
+                  <form onSubmit={handleSavePhone} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '0.375rem', overflow: 'hidden' }}>
+                      <span style={{ padding: '0.35rem 0.5rem', background: '#f8fafc', fontSize: '0.85rem', color: '#64748b', fontWeight: 600, borderRight: '1px solid #cbd5e1' }}>+91</span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={phoneInput}
+                        onChange={(e) => {
+                          setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10));
+                          if (phoneError) setPhoneError('');
+                        }}
+                        placeholder="10-digit mobile number"
+                        style={{
+                          padding: '0.35rem 0.6rem',
+                          border: 'none',
+                          fontSize: '0.9rem',
+                          outline: 'none',
+                        }}
+                        required
+                        autoFocus
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingPhone || phoneInput.replace(/\D/g, '').length !== 10}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        background: '#0284c7',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: savingPhone || phoneInput.replace(/\D/g, '').length !== 10 ? 'not-allowed' : 'pointer',
+                        opacity: savingPhone || phoneInput.replace(/\D/g, '').length !== 10 ? 0.6 : 1,
+                      }}
+                    >
+                      {savingPhone ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingPhone(false);
+                        setPhoneError('');
+                        setPhoneInput(user?.phone && user?.phone !== '0000000000' ? user.phone : '');
+                      }}
+                      style={{
+                        padding: '0.35rem 0.6rem',
+                        background: '#f1f5f9',
+                        color: '#64748b',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                  {phoneError && (
+                    <p style={{ color: '#ef4444', fontSize: '0.78rem', margin: '0.35rem 0 0 0' }}>
+                      {phoneError}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p style={{
                   fontSize: '1.125rem',
@@ -240,14 +263,18 @@ export default function Profile() {
                   color: user?.phone && user?.phone !== '0000000000' ? '#1e293b' : '#94a3b8',
                   margin: 0
                 }}>
-                  {user?.phone && user?.phone !== '0000000000' ? user.phone : 'Not added'}
+                  {user?.phone && user?.phone !== '0000000000' ? `+91 ${user.phone}` : 'Not added'}
                 </p>
               )}
             </div>
           </div>
           {!isEditingPhone && (
             <button
-              onClick={() => setIsEditingPhone(true)}
+              onClick={() => {
+                setIsEditingPhone(true);
+                setPhoneError('');
+                setPhoneInput(user?.phone && user?.phone !== '0000000000' ? user.phone : '');
+              }}
               style={{
                 fontSize: '0.8rem',
                 fontWeight: '600',

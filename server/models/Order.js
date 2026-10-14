@@ -162,6 +162,11 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    customerPhone: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,
