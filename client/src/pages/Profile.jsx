@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import PhoneVerificationModal from '../components/PhoneVerificationModal';
-import { LogOut, User, Mail, Phone, LogIn, KeyRound, CheckCircle2, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
+import { LogOut, User, Mail, Phone, LogIn, KeyRound, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function Profile() {
   const { user, isAuthenticated, logout, refreshUser } = useAuth();
@@ -12,11 +11,6 @@ export default function Profile() {
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [phoneInput, setPhoneInput] = useState(user?.phone && user?.phone !== '0000000000' ? user.phone : '');
   const [savingPhone, setSavingPhone] = useState(false);
-  const [showPhoneVerificationModal, setShowPhoneVerificationModal] = useState(false);
-
-  const isPhoneVerified = Boolean(
-    (user?.phoneVerified || user?.isPhoneVerified) && (user?.phone || user?.phoneNumber)
-  );
 
   const handleSavePhone = async (e) => {
     e.preventDefault();
@@ -179,100 +173,96 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Phone Number Item with Edit/Add & Verification capability */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.75rem' }}>
+        {/* Phone Number Item with Edit/Add capability */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ background: '#e0f2fe', padding: '0.75rem', borderRadius: '0.5rem', color: '#0284c7' }}>
               <Phone size={24} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0' }}>Phone Number</p>
-                {user?.phone && user?.phone !== '0000000000' && (
-                  isPhoneVerified ? (
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      color: '#16a34a',
-                      backgroundColor: '#dcfce7',
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '9999px',
-                    }}>
-                      <ShieldCheck size={12} /> Verified
-                    </span>
-                  ) : (
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      color: '#b45309',
-                      backgroundColor: '#fef3c7',
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '9999px',
-                    }}>
-                      Unverified
-                    </span>
-                  )
-                )}
-              </div>
-              <p style={{
-                fontSize: '1.125rem',
-                fontWeight: user?.phone && user?.phone !== '0000000000' ? '600' : '400',
-                color: user?.phone && user?.phone !== '0000000000' ? '#1e293b' : '#94a3b8',
-                margin: '0.25rem 0 0 0'
-              }}>
-                {user?.phone && user?.phone !== '0000000000' ? `+91 ${user.phone}` : 'Not added'}
-              </p>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 0.25rem 0' }}>Phone Number</p>
+              {isEditingPhone ? (
+                <form onSubmit={handleSavePhone} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <input
+                    type="tel"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="Enter 10-digit number"
+                    style={{
+                      padding: '0.35rem 0.6rem',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                    }}
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingPhone}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {savingPhone ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingPhone(false);
+                      setPhoneInput(user?.phone && user?.phone !== '0000000000' ? user.phone : '');
+                    }}
+                    style={{
+                      padding: '0.35rem 0.6rem',
+                      background: '#f1f5f9',
+                      color: '#64748b',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <p style={{
+                  fontSize: '1.125rem',
+                  fontWeight: user?.phone && user?.phone !== '0000000000' ? '600' : '400',
+                  color: user?.phone && user?.phone !== '0000000000' ? '#1e293b' : '#94a3b8',
+                  margin: 0
+                }}>
+                  {user?.phone && user?.phone !== '0000000000' ? user.phone : 'Not added'}
+                </p>
+              )}
             </div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {!isPhoneVerified && user?.phone && user?.phone !== '0000000000' && (
-              <button
-                type="button"
-                onClick={() => setShowPhoneVerificationModal(true)}
-                style={{
-                  fontSize: '0.8rem',
-                  fontWeight: '700',
-                  color: '#ffffff',
-                  background: '#0D6EFD',
-                  border: 'none',
-                  padding: '0.4rem 0.85rem',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  boxShadow: '0 2px 6px rgba(13, 110, 253, 0.35)',
-                }}
-              >
-                <ShieldCheck size={14} /> Verify Now
-              </button>
-            )}
-
+          {!isEditingPhone && (
             <button
-              type="button"
-              onClick={() => setShowPhoneVerificationModal(true)}
+              onClick={() => setIsEditingPhone(true)}
               style={{
                 fontSize: '0.8rem',
                 fontWeight: '600',
                 color: '#0284c7',
                 background: '#e0f2fe',
                 border: 'none',
-                padding: '0.4rem 0.75rem',
+                padding: '0.35rem 0.75rem',
                 borderRadius: '0.375rem',
                 cursor: 'pointer',
                 transition: 'background 0.2s',
               }}
             >
-              {user?.phone && user?.phone !== '0000000000' ? 'Change & Verify' : 'Add & Verify'}
+              {user?.phone && user?.phone !== '0000000000' ? 'Edit' : 'Add Phone'}
             </button>
-          </div>
+          )}
         </div>
 
         {/* Security & Authentication Section */}
@@ -358,14 +348,6 @@ export default function Profile() {
           Sign Out
         </button>
       </div>
-
-      {/* Phone Verification Modal */}
-      <PhoneVerificationModal
-        isOpen={showPhoneVerificationModal}
-        onClose={() => setShowPhoneVerificationModal(false)}
-        onSuccess={() => setShowPhoneVerificationModal(false)}
-        initialPhone={user?.phone || user?.phoneNumber || ''}
-      />
     </div>
   );
 }

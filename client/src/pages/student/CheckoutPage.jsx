@@ -4,8 +4,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { detectUserLocality } from '../../utils/locationService';
 import { isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
-import PhoneVerificationModal from '../../components/PhoneVerificationModal';
-import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2, Lock, ArrowRight } from 'lucide-react';
+import { MapPin, Plus, Check, Tag, CreditCard, ShoppingBag, ShieldCheck, AlertCircle, ArrowLeft, CheckCircle, Zap, Compass, Loader2, Lock } from 'lucide-react';
 
 export default function CheckoutPage() {
   const { user } = useAuth();
@@ -24,11 +23,6 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [showPhoneVerificationModal, setShowPhoneVerificationModal] = useState(false);
-
-  const isPhoneVerified = Boolean(
-    (user?.phoneVerified || user?.isPhoneVerified) && (user?.phone || user?.phoneNumber)
-  );
 
   // Location Detection State
   const [locationDetecting, setLocationDetecting] = useState(false);
@@ -417,12 +411,6 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async () => {
     if (submitting) return;
 
-    if (!isPhoneVerified) {
-      setError('A verified mobile number is mandatory before placing a delivery order. Please verify your phone number.');
-      setShowPhoneVerificationModal(true);
-      return;
-    }
-
     if (shop && !isShopOpen(shop)) {
       const reason = getShopClosedReason(shop);
       setError(
@@ -485,13 +473,6 @@ export default function CheckoutPage() {
     } catch (err) {
       console.error('Failed to place order:', err);
       setError(err.message || 'Failed to place order. Please try again.');
-      if (
-        err.code === 'PHONE_NOT_VERIFIED' ||
-        (err.message && err.message.toLowerCase().includes('phone')) ||
-        (err.message && err.message.toLowerCase().includes('verified'))
-      ) {
-        setShowPhoneVerificationModal(true);
-      }
       setSubmitting(false);
     }
   };
@@ -568,74 +549,6 @@ export default function CheckoutPage() {
         }}>
           <AlertCircle size={18} />
           <span>{error}</span>
-        </div>
-      )}
-
-      {/* Mandatory Phone Verification Banner */}
-      {!isPhoneVerified && (
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1.5px solid #93c5fd',
-            borderRadius: '0.75rem',
-            padding: '1.2rem 1.4rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            flexWrap: 'wrap',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '50%',
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)',
-              }}
-            >
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '1rem', fontWeight: 800, color: '#1e3a8a' }}>
-                Phone Number Verification Required
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.84rem', color: '#1d4ed8', lineHeight: 1.4 }}>
-                A verified mobile number is required to place delivery orders. Your cart items, selected address, and delivery calculations will remain preserved.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowPhoneVerificationModal(true)}
-            style={{
-              backgroundColor: '#0D6EFD',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '0.6rem',
-              padding: '0.65rem 1.25rem',
-              fontWeight: 700,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              boxShadow: '0 4px 12px rgba(13, 110, 253, 0.35)',
-            }}
-          >
-            <span>Verify Phone Now</span>
-            <ArrowRight size={16} />
-          </button>
         </div>
       )}
 
@@ -1236,14 +1149,8 @@ export default function CheckoutPage() {
 
             {/* Place Order Button */}
             <button
-              onClick={() => {
-                if (!isPhoneVerified) {
-                  setShowPhoneVerificationModal(true);
-                } else {
-                  handlePlaceOrder();
-                }
-              }}
-              disabled={submitting || (isPhoneVerified && !selectedAddressId) || (shop && !isShopOpen(shop))}
+              onClick={handlePlaceOrder}
+              disabled={submitting || !selectedAddressId || (shop && !isShopOpen(shop))}
               className="btn-primary"
               style={{
                 width: '100%',
@@ -1253,26 +1160,15 @@ export default function CheckoutPage() {
                 marginTop: '1.5rem',
                 justifyContent: 'center',
                 opacity: submitting || (shop && !isShopOpen(shop)) ? 0.7 : 1,
-                background: !isPhoneVerified
-                  ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)'
-                  : shop && !isShopOpen(shop)
-                  ? '#94a3b8'
-                  : undefined,
+                background: shop && !isShopOpen(shop) ? '#94a3b8' : undefined,
                 cursor: shop && !isShopOpen(shop) ? 'not-allowed' : 'pointer',
               }}
             >
-              {submitting ? (
-                'Placing Order...'
-              ) : !isPhoneVerified ? (
-                <>
-                  <Lock size={18} style={{ marginRight: '6px' }} />
-                  Verify Phone to Place Order
-                </>
-              ) : shop && !isShopOpen(shop) ? (
-                'Shop Closed - Cannot Order'
-              ) : (
-                'Place Order Now'
-              )}
+              {submitting
+                ? 'Placing Order...'
+                : shop && !isShopOpen(shop)
+                ? 'Shop Closed - Cannot Order'
+                : 'Place Order Now'}
             </button>
           </div>
         </div>
@@ -1562,17 +1458,6 @@ export default function CheckoutPage() {
           }
         }
       `}</style>
-
-      {/* Phone Verification Modal */}
-      <PhoneVerificationModal
-        isOpen={showPhoneVerificationModal}
-        onClose={() => setShowPhoneVerificationModal(false)}
-        onSuccess={() => {
-          setError('');
-          setShowPhoneVerificationModal(false);
-        }}
-        initialPhone={user?.phone || user?.phoneNumber || ''}
-      />
     </div>
   );
 }

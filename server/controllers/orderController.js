@@ -163,22 +163,6 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Mandatory Phone Verification Security Enforcement for Delivery Orders
-    const freshUser = await User.findById(req.user._id).select('phone phoneNumber phoneVerified');
-    const hasVerifiedPhone =
-      freshUser &&
-      (freshUser.phone || freshUser.phoneNumber) &&
-      freshUser.phoneVerified === true;
-
-    if (!hasVerifiedPhone) {
-      return res.status(403).json({
-        success: false,
-        code: 'PHONE_NOT_VERIFIED',
-        message:
-          'A verified mobile number is mandatory before placing a delivery order. Please verify your phone number.',
-      });
-    }
-
     if (!['COD', 'UPI', 'ONLINE'].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,

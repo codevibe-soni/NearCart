@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
-import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -13,7 +12,6 @@ const firebaseConfig = {
 
 let app = null;
 let messaging = null;
-let firebaseAuth = null;
 
 const isConfigValid = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
@@ -27,18 +25,6 @@ try {
 } catch (err) {
   console.warn('⚠️ [FCM] Firebase App initialization notice:', err.message);
 }
-
-export const getFirebaseAuth = () => {
-  if (!firebaseAuth && app) {
-    try {
-      firebaseAuth = getAuth(app);
-    } catch (authErr) {
-      console.warn('[Firebase Auth] Notice:', authErr.message);
-    }
-  }
-  return firebaseAuth;
-};
-
 
 /**
  * Register FCM device token with CampusCart backend
