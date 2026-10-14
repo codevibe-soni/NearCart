@@ -1,8 +1,12 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import Notification from '../models/Notification.js';
+import PhoneOtp from '../models/PhoneOtp.js';
 import { isValidEmail, normalizeEmail } from '../utils/emailValidator.js';
+import { normalizeIndianPhone } from '../utils/phoneValidator.js';
 import { sendWelcomeEmailToUser, sendStaffWelcomeEmailToStaff } from '../services/emailService.js';
+import { verifyFirebasePhoneIdToken } from '../services/firebaseAdmin.js';
 
 // Helper to generate JWT token and set HTTP-only cookie
 const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
@@ -29,7 +33,9 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
     _id: user._id,
     name: user.name,
     email: user.email,
-    phone: user.phone,
+    phone: user.phone || user.phoneNumber || '',
+    phoneNumber: user.phoneNumber || user.phone || '',
+    phoneVerified: Boolean(user.phoneVerified),
     role: user.role,
     customerType: user.customerType || 'STUDENT',
     accountStatus: user.accountStatus,
@@ -401,7 +407,9 @@ export const getMe = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        phone: user.phone || user.phoneNumber || '',
+        phoneNumber: user.phoneNumber || user.phone || '',
+        phoneVerified: Boolean(user.phoneVerified),
         role: user.role,
         customerType: user.customerType || 'STUDENT',
         accountStatus: user.accountStatus,
@@ -492,7 +500,18 @@ export const updateProfile = async (req, res, next) => {
     }
 
     if (name) user.name = name.trim();
-    if (phone) user.phone = phone.trim();
+    if (phone) {
+      const { isValid, normalized, localNumber, error: phoneErr } = normalizeIndianPhone(phone);
+      if (!isValid) {
+        return res.status(400).json({ success: false, message: phoneErr });
+      }
+      // If phone number actually changed, reset verification status
+      if (user.phone !== localNumber && user.phoneNumber !== normalized) {
+        user.phone = localNumber;
+        user.phoneNumber = normalized;
+        user.phoneVerified = false;
+      }
+    }
     if (profileImage !== undefined) user.profileImage = profileImage;
     if (req.body.isOnline !== undefined) user.isOnline = Boolean(req.body.isOnline);
     if (customerType && ['STUDENT', 'ATITHI'].includes(customerType.toUpperCase())) {
@@ -508,7 +527,9 @@ export const updateProfile = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        phone: user.phone || user.phoneNumber || '',
+        phoneNumber: user.phoneNumber || user.phone || '',
+        phoneVerified: Boolean(user.phoneVerified),
         role: user.role,
         customerType: user.customerType || 'STUDENT',
         accountStatus: user.accountStatus,
@@ -649,6 +670,319 @@ export const getSocketToken = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to generate socket token',
+    });
+  }
+};
+
+// @route   POST /api/auth/phone/send-otp
+// @desc    Send 6-digit SMS OTP for phone verification
+// @access  Private
+export const sendPhoneOtp = async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required',
+      });
+    }
+
+    const { isValid, normalized, localNumber, error } = normalizeIndianPhone(phone);
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: error,
+      });
+    }
+
+    // Check if phone number is already verified by another account
+    const existingConflict = await User.findOne({
+      $or: [
+        { phone: normalized },
+        { phoneNumber: normalized },
+        { phone: localNumber },
+        { phoneNumber: localNumber },
+      ],
+      phoneVerified: true,
+      _id: { $ne: req.user._id },
+    });
+
+    if (existingConflict) {
+      return res.status(400).json({
+        success: false,
+        message: 'This mobile number is already registered and verified on another NearCart account.',
+      });
+    }
+
+    // Check cooldown & rate limiting using PhoneOtp
+    const existingOtp = await PhoneOtp.findOne({ userId: req.user._id, phone: normalized });
+    if (existingOtp) {
+      const now = Date.now();
+      const lastSent = new Date(existingOtp.lastSentAt).getTime();
+      const cooldownMs = 60 * 1000; // 60 seconds cooldown
+      if (now - lastSent < cooldownMs) {
+        const remainingSec = Math.ceil((cooldownMs - (now - lastSent)) / 1000);
+        return res.status(429).json({
+          success: false,
+          message: `Please wait ${remainingSec} seconds before requesting another OTP.`,
+          retryAfter: remainingSec,
+        });
+      }
+
+      // Check max resend count in 1 hour (rate limiting)
+      const oneHourAgo = now - 60 * 60 * 1000;
+      if (
+        existingOtp.createdAt &&
+        new Date(existingOtp.createdAt).getTime() > oneHourAgo &&
+        existingOtp.resendCount >= 5
+      ) {
+        return res.status(429).json({
+          success: false,
+          message: 'Too many OTP requests for this number. Please try again after 1 hour.',
+        });
+      }
+    }
+
+    // Generate cryptographically secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    // Store securely hashed in database
+    await PhoneOtp.createHashedOtp({
+      userId: req.user._id,
+      phone: normalized,
+      otp,
+      expiresInMinutes: 10,
+    });
+
+    // Send transactional SMS if Brevo or SMS provider configured
+    if (process.env.BREVO_API_KEY) {
+      try {
+        const smsRes = await fetch('https://api.brevo.com/v3/transactionalSMS/sms', {
+          method: 'POST',
+          headers: {
+            'api-key': process.env.BREVO_API_KEY,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            sender: 'NearCart',
+            recipient: normalized,
+            content: `Your NearCart verification OTP is ${otp}. Valid for 10 minutes. Do not share this code with anyone.`,
+            type: 'transactional',
+          }),
+        });
+        const smsData = await smsRes.json().catch(() => ({}));
+        if (smsRes.ok) {
+          console.log(`[SMS Provider] Brevo SMS sent successfully to ${normalized}`);
+        } else {
+          console.warn(`[SMS Provider Warning] Brevo SMS API response:`, smsData);
+        }
+      } catch (smsErr) {
+        console.warn(`[SMS Provider Notice] Brevo SMS delivery notice:`, smsErr.message);
+      }
+    }
+
+    const masked = normalized.slice(0, 5) + '****' + normalized.slice(-2);
+    console.log(`[Phone Verification] OTP dispatched to ${masked}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `OTP sent successfully to ${masked}. Valid for 10 minutes.`,
+      cooldownSeconds: 60,
+      phone: normalized,
+      localNumber,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   POST /api/auth/phone/verify-otp
+// @desc    Verify 6-digit OTP and mark phone number verified
+// @access  Private
+export const verifyPhoneOtp = async (req, res, next) => {
+  try {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number and 6-digit OTP are required',
+      });
+    }
+
+    const { isValid, normalized, localNumber, error } = normalizeIndianPhone(phone);
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: error,
+      });
+    }
+
+    const otpRecord = await PhoneOtp.findOne({ userId: req.user._id, phone: normalized });
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active OTP found for this number or OTP has expired. Please request a new OTP.',
+      });
+    }
+
+    const verificationResult = otpRecord.verifyOtp(String(otp).trim());
+    if (!verificationResult.valid) {
+      if (verificationResult.reason === 'MAX_ATTEMPTS_EXCEEDED') {
+        await PhoneOtp.deleteOne({ _id: otpRecord._id });
+        return res.status(429).json({
+          success: false,
+          message: 'Too many incorrect attempts. Please request a new OTP.',
+        });
+      }
+      if (verificationResult.reason === 'EXPIRED') {
+        await PhoneOtp.deleteOne({ _id: otpRecord._id });
+        return res.status(400).json({
+          success: false,
+          message: 'OTP has expired. Please request a new OTP.',
+        });
+      }
+
+      // Record failed attempt
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+      const remaining = otpRecord.maxAttempts - otpRecord.attempts;
+      return res.status(400).json({
+        success: false,
+        message: `Invalid OTP. ${remaining} attempt(s) remaining.`,
+      });
+    }
+
+    // OTP is valid! Delete record
+    await PhoneOtp.deleteOne({ _id: otpRecord._id });
+
+    // Ensure phone is not already registered and verified on another account
+    const existingConflict = await User.findOne({
+      $or: [
+        { phone: normalized },
+        { phoneNumber: normalized },
+        { phone: localNumber },
+        { phoneNumber: localNumber },
+      ],
+      phoneVerified: true,
+      _id: { $ne: req.user._id },
+    });
+    if (existingConflict) {
+      return res.status(400).json({
+        success: false,
+        message: 'This mobile number is already registered and verified on another account.',
+      });
+    }
+
+    // Update user record
+    const user = await User.findById(req.user._id);
+    user.phone = localNumber;
+    user.phoneNumber = normalized;
+    user.phoneVerified = true;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Phone number verified successfully! You can now place delivery orders.',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        phoneNumber: user.phoneNumber,
+        phoneVerified: true,
+        role: user.role,
+        customerType: user.customerType || 'STUDENT',
+        accountStatus: user.accountStatus,
+        profileImage: user.profileImage,
+        authProvider: user.authProvider || 'local',
+        passwordSet: user.passwordSet !== undefined ? user.passwordSet : true,
+        googleConnected: Boolean(user.googleId),
+        isActive: user.isActive,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   POST /api/auth/phone/verify-firebase
+// @desc    Verify Firebase Phone Auth ID token and mark phone verified
+// @access  Private
+export const verifyFirebasePhoneToken = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Firebase ID token is required for verification.',
+      });
+    }
+
+    // Cryptographically verify ID token with Google Firebase Admin SDK
+    const verifiedE164Phone = await verifyFirebasePhoneIdToken(idToken);
+    const { isValid, normalized, localNumber, error } = normalizeIndianPhone(verifiedE164Phone);
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: error || 'Verified phone number is not a valid Indian mobile number.',
+      });
+    }
+
+    // Check conflict
+    const existingConflict = await User.findOne({
+      $or: [
+        { phone: normalized },
+        { phoneNumber: normalized },
+        { phone: localNumber },
+        { phoneNumber: localNumber },
+      ],
+      phoneVerified: true,
+      _id: { $ne: req.user._id },
+    });
+    if (existingConflict) {
+      return res.status(400).json({
+        success: false,
+        message: 'This mobile number is already registered and verified on another NearCart account.',
+      });
+    }
+
+    // Update user record
+    const user = await User.findById(req.user._id);
+    user.phone = localNumber;
+    user.phoneNumber = normalized;
+    user.phoneVerified = true;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Phone number verified successfully! You can now place delivery orders.',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        phoneNumber: user.phoneNumber,
+        phoneVerified: true,
+        role: user.role,
+        customerType: user.customerType || 'STUDENT',
+        accountStatus: user.accountStatus,
+        profileImage: user.profileImage,
+        authProvider: user.authProvider || 'local',
+        passwordSet: user.passwordSet !== undefined ? user.passwordSet : true,
+        googleConnected: Boolean(user.googleId),
+        isActive: user.isActive,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Firebase phone verification failed.',
     });
   }
 };

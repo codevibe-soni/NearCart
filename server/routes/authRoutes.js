@@ -10,6 +10,9 @@ import {
   getSocketToken,
   updateProfile,
   createStaff,
+  sendPhoneOtp,
+  verifyPhoneOtp,
+  verifyFirebasePhoneToken,
 } from '../controllers/authController.js';
 
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
@@ -27,6 +30,11 @@ router.get('/me', protect, getMe);
 router.post('/set-password', protect, setPassword);
 router.get('/socket-token', protect, getSocketToken);
 router.put('/profile', protect, updateProfile);
+
+// Phone verification routes
+router.post('/phone/send-otp', protect, sendPhoneOtp);
+router.post('/phone/verify-otp', protect, verifyPhoneOtp);
+router.post('/phone/verify-firebase', protect, verifyFirebasePhoneToken);
 
 // Admin only route
 router.post(
