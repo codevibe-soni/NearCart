@@ -36,9 +36,14 @@ const CATEGORIES = [
     sortOrder: 1,
   },
   {
+    name: 'Hotels',
+    description: 'Hotels, lodges and hospitality services',
+    sortOrder: 2,
+  },
+  {
     name: 'Grocery',
     description: 'Daily grocery essentials — rice, pulses, oil, spices and more',
-    sortOrder: 2,
+    sortOrder: 3,
   },
   {
     name: 'Snacks & Drinks',

@@ -19,62 +19,109 @@ export default function Student() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const initialCat = searchParams.get('category') || '';
   const initialSearch = searchParams.get('search') || '';
 
   const [shops, setShops] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
-  const [selectedCategory, setSelectedCategory] = useState(initialCat);
+  // selectedCategory always holds a category ObjectId (or '' for All)
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [closedModalShop, setClosedModalShop] = useState(null);
 
-  // Sync state from URL parameters when URL changes (e.g. back/forward nav)
-  useEffect(() => {
-    const cat = searchParams.get('category') || '';
-    const q = searchParams.get('search') || '';
-    if (cat !== selectedCategory) setSelectedCategory(cat);
-    if (q !== submittedSearch) {
-      setSubmittedSearch(q);
-      setSearchInput(q);
-    }
-  }, [searchParams]);
+  // Helper: resolve a category URL param (name or ID) to an ObjectId using the loaded categories list
+  const resolveCategoryId = (catParam, catList) => {
+    if (!catParam) return '';
+    // If it already matches an ID in the list, use it directly
+    const byId = catList.find((c) => c._id === catParam);
+    if (byId) return byId._id;
+    // Otherwise try matching by name (case-insensitive)
+    const byName = catList.find((c) => c.name.toLowerCase() === catParam.trim().toLowerCase());
+    if (byName) return byName._id;
+    return ''; // Unknown category — treat as "All"
+  };
 
-  const updateUrlParams = (catVal, searchVal) => {
+  // Helper: get category name from ID for URL display
+  const getCategoryName = (catId) => {
+    if (!catId) return '';
+    const cat = categories.find((c) => c._id === catId);
+    return cat ? cat.name : '';
+  };
+
+  const updateUrlParams = (catId, searchVal) => {
     const params = {};
-    if (catVal) params.category = catVal;
+    // Store human-readable category name in URL, not ObjectId
+    const catName = getCategoryName(catId);
+    if (catName) params.category = catName;
     if (searchVal) params.search = searchVal;
     setSearchParams(params);
   };
 
-  const fetchData = async (activeCat = selectedCategory, activeQuery = submittedSearch) => {
-    setLoading(true);
-    setError('');
-    try {
-      const shopParams = {};
-      if (activeQuery) shopParams.search = activeQuery;
-      if (activeCat) shopParams.category = activeCat;
-
-      const queryString = new URLSearchParams(shopParams).toString();
-      const [shopsRes, catRes] = await Promise.all([
-        getShops(queryString ? `?${queryString}` : ''),
-        getCategories(),
-      ]);
-
-      if (shopsRes.success) setShops(shopsRes.shops || []);
-      if (catRes.success) setCategories(catRes.categories || []);
-    } catch (err) {
-      setError(err.message || 'Failed to load NearCart shops');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Sync state from URL parameters when URL changes (e.g. back/forward nav)
   useEffect(() => {
-    fetchData(selectedCategory, submittedSearch);
-  }, [selectedCategory, submittedSearch]);
+    if (!categoriesLoaded) return; // Wait until categories are loaded to resolve names→IDs
+    const catParam = searchParams.get('category') || '';
+    const q = searchParams.get('search') || '';
+    const resolvedId = resolveCategoryId(catParam, categories);
+    if (resolvedId !== selectedCategory) setSelectedCategory(resolvedId);
+    if (q !== submittedSearch) {
+      setSubmittedSearch(q);
+      setSearchInput(q);
+    }
+  }, [searchParams, categoriesLoaded, categories]);
+
+  // Load categories first, then resolve URL param and fetch shops
+  useEffect(() => {
+    let cancelled = false;
+    const loadCategories = async () => {
+      try {
+        const catRes = await getCategories();
+        if (!cancelled && catRes.success) {
+          const catList = catRes.categories || [];
+          setCategories(catList);
+          // Resolve initial URL category param → ObjectId
+          const urlCatParam = searchParams.get('category') || '';
+          const resolvedId = resolveCategoryId(urlCatParam, catList);
+          setSelectedCategory(resolvedId);
+          setCategoriesLoaded(true);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load categories');
+      }
+    };
+    loadCategories();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch shops whenever category or search changes (but only after categories are loaded)
+  useEffect(() => {
+    if (!categoriesLoaded) return;
+    let cancelled = false;
+    const fetchShops = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const shopParams = {};
+        if (submittedSearch) shopParams.search = submittedSearch;
+        // Always send the ObjectId to the backend
+        if (selectedCategory) shopParams.category = selectedCategory;
+
+        const queryString = new URLSearchParams(shopParams).toString();
+        const shopsRes = await getShops(queryString ? `?${queryString}` : '');
+
+        if (!cancelled && shopsRes.success) setShops(shopsRes.shops || []);
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load NearCart shops');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchShops();
+    return () => { cancelled = true; };
+  }, [selectedCategory, submittedSearch, categoriesLoaded]);
 
   const handleCategorySelect = (catId) => {
     const nextCat = selectedCategory === catId ? '' : catId;
@@ -116,9 +163,7 @@ export default function Student() {
     navigate(navUrl);
   };
 
-  const selectedCategoryObj = categories.find(
-    (c) => c._id === selectedCategory || c.name.toLowerCase() === selectedCategory.toLowerCase()
-  );
+  const selectedCategoryObj = categories.find((c) => c._id === selectedCategory);
   const categoryTitle = selectedCategoryObj ? selectedCategoryObj.name : 'Shops';
 
   return (
@@ -176,7 +221,7 @@ export default function Student() {
             <CategoryCard
               key={cat._id}
               category={cat}
-              isSelected={selectedCategory === cat._id || selectedCategory.toLowerCase() === cat.name.toLowerCase()}
+              isSelected={selectedCategory === cat._id}
               onClick={() => handleCategorySelect(cat._id)}
             />
           ))}

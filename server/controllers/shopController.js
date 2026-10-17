@@ -15,21 +15,25 @@ export const getShops = async (req, res, next) => {
       isActive: true,
     };
 
+    // Category filter: accepts ObjectId (preferred) or category name (backward compat)
     if (category) {
       if (mongoose.Types.ObjectId.isValid(category)) {
         query.category = category;
       } else {
+        // Backward compatibility: resolve category name → ObjectId via exact match
         const catDoc = await Category.findOne({
-          name: new RegExp(`^${category.trim()}`, 'i'),
+          name: { $regex: `^${category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim()}$`, $options: 'i' },
         });
         if (catDoc) {
           query.category = catDoc._id;
         } else {
+          // Unknown category name: use a dummy ObjectId to guarantee zero results
           query.category = new mongoose.Types.ObjectId();
         }
       }
     }
 
+    // Search filter: uses $and so it doesn't overwrite any existing $or from other filters
     if (search) {
       const searchRegex = new RegExp(search.trim(), 'i');
       query.$or = [{ name: searchRegex }, { description: searchRegex }, { foodType: searchRegex }];

@@ -4,8 +4,13 @@ export const getCategories = async (search = '') => {
   return await api.get(`/categories${search ? `?search=${encodeURIComponent(search)}` : ''}`);
 };
 
-export const getShops = async (search = '') => {
-  return await api.get(`/shops${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+export const getShopCategories = async (shopId) => {
+  return await api.get(`/categories/shop/${shopId}`);
+};
+
+export const getShops = async (queryString = '') => {
+  // queryString is already a formatted string like "?category=abc&search=xyz"
+  return await api.get(`/shops${queryString}`);
 };
 
 export const getShopById = async (id) => {

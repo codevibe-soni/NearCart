@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { checkHealth } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -18,10 +18,15 @@ import {
   Layers,
   Code,
 } from 'lucide-react';
+import { getCategories } from '../services/studentService';
+import { CategoryCard } from '../components/StudentUIComponents';
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [apiStatus, setApiStatus] = useState({ loading: true, success: false, message: '' });
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   const getDashboardPath = () => {
     if (!user) return '/student';
@@ -37,6 +42,26 @@ export default function Home() {
       default:
         return '/student';
     }
+  };
+
+  // Load categories for home navigation
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await getCategories();
+        if (res && res.success) {
+          setCategories(res.categories || []);
+        }
+      } catch (_) {}
+      setCategoriesLoading(false);
+    };
+    load();
+  }, []);
+
+  const handleHomeCategorySelect = (cat) => {
+    // Navigate to student listing with category name in URL (Student page resolves name -> ID)
+    const url = cat.name ? `/student?category=${encodeURIComponent(cat.name)}` : '/student';
+    navigate(url);
   };
 
   useEffect(() => {
@@ -183,6 +208,32 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Category Navigation Section */}
+      {categoriesLoading ? null : (
+        <section style={{ padding: '2rem 0', background: '#f9fafb', borderTop: '1px solid var(--border-color)' }}>
+          <div className="container">
+            <div style={{ marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)' }}>Shop Categories</h3>
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+              <CategoryCard
+                category={{ name: 'All Shops' }}
+                isSelected={false}
+                onClick={() => navigate('/student')}
+              />
+              {categories.map((cat) => (
+                <CategoryCard
+                  key={cat._id}
+                  category={cat}
+                  isSelected={false}
+                  onClick={() => handleHomeCategorySelect(cat)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* What's New / Latest Updates Section */}
       <section style={{ padding: '2.5rem 0', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>

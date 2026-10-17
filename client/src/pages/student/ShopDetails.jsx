@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { getShopById, getProducts, getCategories } from '../../services/studentService';
-import { ProductCard, LoadingSpinner, EmptyState, SearchBar, CategoryCard, formatTimeAMPM, isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
-import { Store, ArrowLeft, Phone, MapPin, Star, Clock, Tag } from 'lucide-react';
+import { getShopById, getProducts } from '../../services/studentService';
+import { ProductCard, LoadingSpinner, EmptyState, SearchBar, formatTimeAMPM, isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
+import { Store, ArrowLeft, Phone, MapPin, Star, Clock } from 'lucide-react';
 import api from '../../services/api';
 
 export default function ShopDetails() {
@@ -10,13 +10,10 @@ export default function ShopDetails() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const initialCat = searchParams.get('category') || '';
   const initialSearch = searchParams.get('search') || '';
 
   const [shop, setShop] = useState(null);
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(initialCat);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 24 });
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
@@ -32,25 +29,22 @@ export default function ShopDetails() {
     setLoading(true);
   }, [id]);
 
-  // Sync category & search state from URL search parameters
+  // Sync search state from URL search parameters
   useEffect(() => {
-    const cat = searchParams.get('category') || '';
     const q = searchParams.get('search') || '';
-    if (cat !== selectedCategory) setSelectedCategory(cat);
     if (q !== submittedSearch) {
       setSubmittedSearch(q);
       setSearchInput(q);
     }
   }, [searchParams]);
 
-  const updateUrlParams = (catVal, searchVal) => {
+  const updateUrlParams = (searchVal) => {
     const params = {};
-    if (catVal) params.category = catVal;
     if (searchVal) params.search = searchVal;
     setSearchParams(params);
   };
 
-  const fetchShopData = async (activeCat = selectedCategory, activeQuery = submittedSearch, activePage = page) => {
+  const fetchShopData = async (activeQuery = submittedSearch, activePage = page) => {
     if (!shop) setLoading(true);
     else setProductsLoading(true);
     setError('');
@@ -62,12 +56,10 @@ export default function ShopDetails() {
         limit: 24,
       };
       if (activeQuery) prodParams.search = activeQuery.trim();
-      if (activeCat) prodParams.category = activeCat;
 
-      const [shopRes, prodRes, catRes] = await Promise.all([
+      const [shopRes, prodRes] = await Promise.all([
         getShopById(id),
         getProducts(prodParams),
-        getCategories(),
       ]);
 
       if (shopRes && shopRes.success) {
@@ -76,9 +68,6 @@ export default function ShopDetails() {
       if (prodRes && prodRes.success) {
         setProducts(prodRes.products || []);
         if (prodRes.pagination) setPagination(prodRes.pagination);
-      }
-      if (catRes && catRes.success) {
-        setCategories(catRes.categories || []);
       }
     } catch (err) {
       setError(err.message || 'Shop is currently unavailable.');
@@ -89,21 +78,16 @@ export default function ShopDetails() {
   };
 
   useEffect(() => {
-    fetchShopData(selectedCategory, submittedSearch, page);
-  }, [id, selectedCategory, submittedSearch, page]);
+    fetchShopData(submittedSearch, page);
+  }, [id, submittedSearch, page]);
 
-  const handleCategorySelect = (catId) => {
-    const nextCat = selectedCategory === catId ? '' : catId;
-    setPage(1);
-    setSelectedCategory(nextCat);
-    updateUrlParams(nextCat, submittedSearch);
-  };
+
 
   const handleSearchSubmit = (query) => {
     const finalQuery = (query !== undefined ? query : searchInput).trim();
     setPage(1);
     setSubmittedSearch(finalQuery);
-    updateUrlParams(selectedCategory, finalQuery);
+    updateUrlParams(finalQuery);
   };
 
   const handleSearchInputChange = (val) => {
@@ -111,7 +95,7 @@ export default function ShopDetails() {
     if (val.trim() === '' && submittedSearch !== '') {
       setPage(1);
       setSubmittedSearch('');
-      updateUrlParams(selectedCategory, '');
+      updateUrlParams('');
     }
   };
 
@@ -137,10 +121,7 @@ export default function ShopDetails() {
   const openTimeFormatted = hasTiming ? formatTimeAMPM(shop.openingTime) : '';
   const closeTimeFormatted = hasTiming ? formatTimeAMPM(shop.closingTime) : '';
 
-  const selectedCategoryObj = categories.find(
-    (c) => c._id === selectedCategory || c.name.toLowerCase() === selectedCategory.toLowerCase()
-  );
-  const categoryTitle = selectedCategoryObj ? selectedCategoryObj.name : 'Category Items';
+
 
   return (
     <div className="container" style={{ padding: '2.5rem 1.5rem 5rem 1.5rem' }}>
@@ -312,55 +293,17 @@ export default function ShopDetails() {
           </div>
         </div>
       )}
-      {categories.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Tag size={18} style={{ color: 'var(--primary)' }} /> Shop Categories
-            </h3>
-            {(selectedCategory || submittedSearch) && (
-              <button
-                onClick={() => {
-                  setSelectedCategory('');
-                  setSubmittedSearch('');
-                  setSearchInput('');
-                  setPage(1);
-                  updateUrlParams('', '');
-                }}
-                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '700' }}
-              >
-                Clear Shop Filters
-              </button>
-            )}
-          </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-            <CategoryCard
-              category={{ name: 'All Products' }}
-              isSelected={selectedCategory === ''}
-              onClick={() => handleCategorySelect('')}
-            />
-            {categories.map((cat) => (
-              <CategoryCard
-                key={cat._id}
-                category={cat}
-                isSelected={selectedCategory === cat._id || selectedCategory.toLowerCase() === cat.name.toLowerCase()}
-                onClick={() => handleCategorySelect(cat._id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Shop Products Section */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)', margin: 0 }}>
-              {selectedCategory ? `${categoryTitle} at ${shop.name}` : submittedSearch ? `Search Results in ${shop.name}` : `Products at ${shop.name}`}
+              {submittedSearch ? `Search Results in ${shop.name}` : `Products at ${shop.name}`}
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
-              {selectedCategory ? `Showing ${categoryTitle} items available in ${shop.name}` : `Browse all available items in ${shop.name}`}
+              {`Browse all available items in ${shop.name}`}
             </p>
           </div>
           <div style={{ maxWidth: '300px', width: '100%' }}>
@@ -378,9 +321,7 @@ export default function ShopDetails() {
         ) : products.length === 0 ? (
           <EmptyState
             message={
-              selectedCategory
-                ? `No items available under "${categoryTitle}" in ${shop.name}.`
-                : submittedSearch
+              submittedSearch
                 ? `No products matching "${submittedSearch}" found in ${shop.name}.`
                 : `No products currently available in ${shop.name}.`
             }
