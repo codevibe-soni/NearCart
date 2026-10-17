@@ -2,7 +2,42 @@
 .splash-overlay {
   position: fixed;
   inset: 0;
-  background: #ffffff; /* use light background; adjust if dark theme */
+  background: #0a0f2c; /* deep navy background */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+/* Blue light pulse effect – expands from center */
+.splash-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 180, 255, 0.6), transparent 70%);
+  opacity: 0;
+  animation: bluePulse 2s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes bluePulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  60% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+  position: fixed;
+  inset: 0;
+  background: #0a0f2c; /* deep navy background */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,7 +96,8 @@
   font-family: 'Inter', sans-serif;
   font-size: 2rem;
   font-weight: 800;
-  color: #111827; /* near text color */
+  color: #ffffff; /* bright white for visibility */
+  text-shadow: 0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(0,180,255,0.4);
 }
 
 .brand-letter {
@@ -89,8 +125,8 @@
 }
 
 .splash-overlay.finished {
-  animation: splashFadeOut 0.5s ease-out forwards;
-  animation-delay: 2.2s; /* adjust to match total animation length */
+  animation: splashFadeOut 0.6s ease-out forwards;
+  animation-delay: 2.4s; /* match updated total duration */
 }
 
 /* Respect prefers-reduced-motion */

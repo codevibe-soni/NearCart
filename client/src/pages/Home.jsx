@@ -19,7 +19,9 @@ import {
   Code,
 } from 'lucide-react';
 import { getCategories } from '../services/studentService';
+import heroPoster from '../assets/hero-poster.jpg';
 import { CategoryCard } from '../components/StudentUIComponents';
+import ShoppingDemo from '../components/ShoppingDemo';
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
@@ -146,94 +148,34 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <section style={{ padding: '4.5rem 0 3.5rem 0', textAlign: 'center', position: 'relative' }}>
-        <div className="container">
-          <h1
-            style={{
-              fontSize: 'clamp(2.2rem, 5vw, 3.6rem)',
-              fontWeight: '800',
-              lineHeight: '1.15',
-              letterSpacing: '-0.03em',
-              marginBottom: '1.25rem',
-              maxWidth: '850px',
-              margin: '0 auto 1.25rem auto',
-            }}
-          >
-            Everything You Need.{' '}
-            <span
-              style={{
-                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Right Around You.
-            </span>
-          </h1>
-
-          <p
-            style={{
-              fontSize: '1.15rem',
-              color: 'var(--text-secondary)',
-              maxWidth: '650px',
-              margin: '0 auto 2.5rem auto',
-              fontWeight: '400',
-            }}
-          >
-            NearCart connects students & customers with nearby local shops for fast, convenient, and reliable local delivery.
-          </p>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center',
-              flexWrap: 'wrap',
-            }}
-          >
-            {isAuthenticated ? (
-              <Link to={getDashboardPath()} className="btn-primary" style={{ padding: '0.85rem 1.75rem', fontSize: '1rem' }}>
-                Go to My Portal ({user?.role}) <ArrowRight size={18} />
-              </Link>
-            ) : (
-              <>
-                <Link to="/student" className="btn-primary" style={{ padding: '0.85rem 1.75rem', fontSize: '1rem' }}>
-                  Browse Marketplace <ArrowRight size={18} />
-                </Link>
-                <Link to="/login" className="btn-secondary" style={{ padding: '0.85rem 1.75rem', fontSize: '1rem' }}>
-                  Partner Sign In
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Category Navigation Section */}
-      {categoriesLoading ? null : (
-        <section style={{ padding: '2rem 0', background: '#f9fafb', borderTop: '1px solid var(--border-color)' }}>
-          <div className="container">
-            <div style={{ marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)' }}>Shop Categories</h3>
-            </div>
-            <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-              <CategoryCard
-                category={{ name: 'All Shops' }}
-                isSelected={false}
-                onClick={() => navigate('/student')}
-              />
-              {categories.map((cat) => (
-                <CategoryCard
-                  key={cat._id}
-                  category={cat}
-                  isSelected={false}
-                  onClick={() => handleHomeCategorySelect(cat)}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
+      <section className="home-hero">
+  <div className="container">
+    <h1 className="hero-title">
+      Shop Local. <span className="hero-highlight">Right Around You.</span>
+    </h1>
+    <p className="hero-subtitle">
+      Fast, convenient delivery from nearby shops.
+    </p>
+    <div className="hero-actions">
+      {isAuthenticated ? (
+        <Link to={getDashboardPath()} className="btn-primary">
+          Go to My Portal ({user?.role}) <ArrowRight size={18} />
+        </Link>
+      ) : (
+        <Link to="/student" className="btn-primary">
+          Explore Shops <ArrowRight size={18} />
+        </Link>
       )}
+    </div>
+    <div className="hero-poster-wrapper">
+      <img src={heroPoster} alt="NearCart hero" className="hero-poster-img" />
+      <ShoppingDemo />
+    </div>
+  </div>
+</section>
+
+
+      
 
       {/* What's New / Latest Updates Section */}
       <section style={{ padding: '2.5rem 0', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
@@ -275,69 +217,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Role Cards Section */}
-      <section style={{ padding: '3.5rem 0' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.5rem' }}>Built for the Entire Ecosystem</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Tailored portals for customers, shopkeepers, delivery partners, and admins.</p>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-            <div className="glass-card">
-              <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                <ShoppingBag style={{ color: 'var(--primary)' }} size={22} />
-              </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '0.4rem' }}>Student / Atithi</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Order snacks, grocery items, stationery, and daily essentials straight to your hostel or location.
-              </p>
-              <Link to="/student" style={{ color: 'var(--primary)', fontSize: '0.875rem', fontWeight: '700' }}>
-                Access Marketplace →
-              </Link>
-            </div>
-
-            <div className="glass-card">
-              <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                <Store style={{ color: 'var(--success)' }} size={22} />
-              </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '0.4rem' }}>Shopkeeper</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Manage inventory, process instant incoming orders, set discount pricing, and accept direct UPI QR payments.
-              </p>
-              <Link to="/shopkeeper" style={{ color: 'var(--success)', fontSize: '0.875rem', fontWeight: '700' }}>
-                Access Portal →
-              </Link>
-            </div>
-
-            <div className="glass-card">
-              <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                <Truck style={{ color: 'var(--warning)' }} size={22} />
-              </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '0.4rem' }}>Delivery Partner</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Earn by completing localized orders with real-time GPS location sharing and transparent payouts.
-              </p>
-              <Link to="/delivery" style={{ color: 'var(--warning)', fontSize: '0.875rem', fontWeight: '700' }}>
-                Access Portal →
-              </Link>
-            </div>
-
-            <div className="glass-card">
-              <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.5rem', background: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                <ShieldCheck style={{ color: '#9333ea' }} size={22} />
-              </div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '0.4rem' }}>Admin</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Onboard store vendors, verify delivery staff, monitor orders, and oversee platform health.
-              </p>
-              <Link to="/admin" style={{ color: '#9333ea', fontSize: '0.875rem', fontWeight: '700' }}>
-                Access Portal →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* How It Works Section */}
       <section id="how-it-works" style={{ padding: '4rem 0', background: '#ffffff', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>

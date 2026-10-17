@@ -68,21 +68,7 @@ export function CategoryCard({ category, onClick, isSelected }) {
   return (
     <div
       onClick={onClick}
-      style={{
-        padding: '0.85rem 1.25rem',
-        borderRadius: 'var(--radius-md)',
-        background: isSelected ? 'var(--primary-gradient)' : '#ffffff',
-        border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}`,
-        color: isSelected ? '#ffffff' : 'var(--text-primary)',
-        fontWeight: isSelected ? '700' : '500',
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        transition: 'all 0.2s ease',
-        boxShadow: isSelected ? '0 4px 14px rgba(2, 132, 199, 0.25)' : 'none',
-      }}
+      className={`category-chip${isSelected ? ' selected' : ''}`}
     >
       <span>{category.name}</span>
     </div>
