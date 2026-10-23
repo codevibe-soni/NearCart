@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { useNotifications } from '../../context/NotificationContext';
-import { ArrowLeft, MapPin, Store, CreditCard, Clock, Package, Phone, User, ShieldCheck, Eye, EyeOff, Star } from 'lucide-react';
+import { ArrowLeft, MapPin, Store, CreditCard, Clock, Package, Phone, User, ShieldCheck, Eye, EyeOff, Star, FileText, RefreshCw, AlertCircle } from 'lucide-react';
 import RateOrderModal from '../../components/RateOrderModal';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -23,6 +23,62 @@ export default function OrderDetailsPage() {
 
   // UPI payment data from server (amount-locked URI)
   const [upiPaymentData, setUpiPaymentData] = useState(null);
+
+  // PDF Receipt download state
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState('');
+
+  const handleDownloadReceipt = async () => {
+    if (downloadingReceipt || !order?._id) return;
+    setDownloadingReceipt(true);
+    setReceiptError('');
+
+    try {
+      const blob = await api.get(`/orders/${order._id}/receipt`, {
+        responseType: 'blob',
+      });
+
+      if (!blob) {
+        throw new Error('Failed to retrieve PDF receipt from server');
+      }
+
+      // Check if response is actually a JSON error wrapped in a blob
+      if (blob.type === 'application/json' || (blob.type && blob.type.includes('json'))) {
+        const text = await blob.text();
+        let errMsg = 'Failed to download receipt';
+        try {
+          const json = JSON.parse(text);
+          if (json.message) errMsg = json.message;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+
+      // Create download link and trigger automatic browser download
+      const safeOrderNum = (order.orderNumber || order._id).replace(/[^a-zA-Z0-9-_]/g, '');
+      const filename = `NearCart-Receipt-${safeOrderNum}.pdf`;
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading receipt PDF:', err);
+      let errMsg = err?.message || 'Failed to download receipt';
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.message) errMsg = json.message;
+        } catch (_) {}
+      }
+      setReceiptError(errMsg);
+    } finally {
+      setDownloadingReceipt(false);
+    }
+  };
 
   // Socket & Live Tracking state
   const [driverLocation, setDriverLocation] = useState(null);
@@ -609,26 +665,78 @@ export default function OrderDetailsPage() {
 
             {/* Download PDF Receipt button */}
             <div style={{ marginTop: '0.75rem' }}>
-              <a
-                href={`/api/orders/${order._id}/receipt`}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={handleDownloadReceipt}
+                disabled={downloadingReceipt}
                 className="btn-secondary"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  padding: '0.45rem 0.85rem',
+                  padding: '0.55rem 0.85rem',
                   fontSize: '0.85rem',
                   width: '100%',
                   justifyContent: 'center',
                   textDecoration: 'none',
                   borderColor: 'rgba(56, 189, 248, 0.4)',
-                  color: 'var(--primary)'
+                  color: 'var(--primary)',
+                  cursor: downloadingReceipt ? 'not-allowed' : 'pointer',
+                  opacity: downloadingReceipt ? 0.75 : 1,
+                  background: downloadingReceipt ? '#f1f5f9' : undefined,
+                  fontWeight: '600',
+                  borderRadius: '0.5rem',
+                  transition: 'all 0.2s ease',
                 }}
               >
-                📄 Download PDF Receipt
-              </a>
+                {downloadingReceipt ? (
+                  <>
+                    <RefreshCw size={15} className="spin" />
+                    <span>Generating Receipt PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText size={15} />
+                    <span>Download Receipt PDF</span>
+                  </>
+                )}
+              </button>
+
+              {receiptError && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    color: 'var(--danger)',
+                    fontSize: '0.8rem',
+                    marginTop: '0.4rem',
+                    padding: '0.4rem 0.6rem',
+                    background: '#fef2f2',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #fecaca',
+                  }}
+                >
+                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                  <span>{receiptError}</span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadReceipt}
+                    style={{
+                      marginLeft: 'auto',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--primary)',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* UPI Payment Box — Dynamic QR with Server-Calculated Amount */}

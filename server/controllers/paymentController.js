@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Payment from '../models/Payment.js';
 import Order from '../models/Order.js';
 import Notification from '../models/Notification.js';
+import Delivery from '../models/Delivery.js';
 
 /**
  * @desc    Get shop-specific UPI QR details for a Student's specific Order
@@ -317,99 +318,231 @@ export const generateReceiptPdf = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Authorization check: Student owner, Shop owner, or Admin
-    const isStudentOwner = req.user.role === 'STUDENT' && order.user._id.toString() === req.user._id.toString();
-    const isShopOwner = req.user.role === 'SHOPKEEPER' && order.shop.owner.toString() === req.user._id.toString();
+    // Authorization check: Student owner, Shop owner, Assigned Delivery partner, or Admin
+    const orderUserId = order.user && order.user._id ? order.user._id.toString() : order.user?.toString();
+    const isStudentOwner = req.user.role === 'STUDENT' && orderUserId === req.user._id.toString();
+
+    const shopOwnerId = order.shop && order.shop.owner
+      ? (order.shop.owner._id ? order.shop.owner._id.toString() : order.shop.owner.toString())
+      : null;
+    const isShopOwner = req.user.role === 'SHOPKEEPER' && shopOwnerId === req.user._id.toString();
     const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isStudentOwner && !isShopOwner && !isAdmin) {
-      return res.status(403).json({ success: false, message: 'Unauthorized access to order receipt' });
+    let isAssignedDelivery = false;
+    if (req.user.role === 'DELIVERY_BOY') {
+      const deliveryRecord = await Delivery.findOne({ order: order._id, deliveryBoy: req.user._id });
+      if (deliveryRecord) isAssignedDelivery = true;
     }
 
-    if (order.paymentStatus !== 'PAID') {
-      return res.status(400).json({ success: false, message: 'Receipt is available only for PAID / VERIFIED orders' });
+    if (!isStudentOwner && !isShopOwner && !isAdmin && !isAssignedDelivery) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to order receipt' });
     }
 
     const payment = await Payment.findOne({ order: order._id });
 
     // Dynamic import PDFDocument safely
     const PDFDocument = (await import('pdfkit')).default;
-    const doc = new PDFDocument({ margin: 40 });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
 
+    // Sanitize filename to NearCart-Receipt-{orderNumber}.pdf
+    const safeOrderNumber = (order.orderNumber || order._id.toString()).replace(/[^a-zA-Z0-9-_]/g, '');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=CampusCart-Receipt-${order.orderNumber}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename="NearCart-Receipt-${safeOrderNumber}.pdf"`);
 
     doc.pipe(res);
 
-    // Header
-    doc.fillColor('#0284c7').fontSize(22).text('CAMPUSCART', { align: 'center', underline: true });
-    doc.fillColor('#334155').fontSize(12).text('Digital Payment Receipt', { align: 'center' });
-    doc.moveDown(1.5);
+    // --- Header Section ---
+    doc.fillColor('#0284c7').fontSize(22).font('Helvetica-Bold').text('NearCart', 40, 40);
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica').text('Campus Hyperlocal Marketplace', 40, 66);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text('OFFICIAL ORDER RECEIPT', 300, 40, { align: 'right' });
+    doc.fontSize(9).font('Helvetica').fillColor('#64748b').text(`Receipt No: ${order.orderNumber || order._id}`, 300, 58, { align: 'right' });
+    doc.text(`Order Date: ${new Date(order.createdAt).toLocaleString('en-IN')}`, 300, 70, { align: 'right' });
 
-    // Metadata Grid
-    doc.fontSize(10).fillColor('#0f172a');
-    doc.text(`Order Number: ${order.orderNumber}`, 40);
-    doc.text(`Order Date: ${new Date(order.createdAt).toLocaleString('en-IN')}`);
-    doc.text(`Payment Verified Date: ${payment?.verifiedAt ? new Date(payment.verifiedAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN')}`);
-    doc.moveDown();
+    doc.strokeColor('#cbd5e1').lineWidth(1).moveTo(40, 88).lineTo(555, 88).stroke();
 
-    doc.text(`Customer Name: ${order.user?.name || 'Student'}`);
-    doc.text(`Customer Phone: ${order.user?.phone || 'N/A'}`);
-    doc.text(`Delivery Address: ${order.address?.fullAddress || 'Campus Address'}`);
-    doc.moveDown();
+    // --- Customer & Shop Metadata ---
+    doc.y = 98;
+    const metaTopY = doc.y;
 
-    doc.text(`Shop Name: ${order.shop?.name || 'Campus Shop'}`);
-    doc.text(`Shop Address: ${order.shop?.address || 'N/A'}`);
-    doc.moveDown(1.5);
-
-    // Table Header
-    doc.fillColor('#0284c7').fontSize(11).text('ITEM DETAILS', { underline: true });
-    doc.moveDown(0.5);
-
-    doc.fontSize(9).fillColor('#475569');
-    doc.text('Item Description', 40, doc.y, { width: 250 });
-    doc.text('Qty', 300, doc.y, { width: 50 });
-    doc.text('Price', 360, doc.y, { width: 60 });
-    doc.text('Subtotal', 440, doc.y, { width: 80 });
-    doc.moveDown(0.3);
-    doc.text('---------------------------------------------------------------------------------------------------');
-    doc.moveDown(0.5);
-
-    doc.fillColor('#0f172a');
-    if (order.items && order.items.length > 0) {
-      order.items.forEach((item) => {
-        const y = doc.y;
-        doc.text(item.name, 40, y, { width: 250 });
-        doc.text(item.quantity.toString(), 300, y, { width: 50 });
-        doc.text(`INR ${item.price.toFixed(2)}`, 360, y, { width: 60 });
-        doc.text(`INR ${item.subtotal.toFixed(2)}`, 440, y, { width: 80 });
-        doc.moveDown(0.5);
-      });
+    // Customer Box (Left Column, x=40, width=240)
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#0284c7').text('CUSTOMER DETAILS', 40, metaTopY);
+    doc.font('Helvetica').fontSize(9).fillColor('#0f172a');
+    doc.text(`Name: ${order.user?.name || 'Student Customer'}`, 40, doc.y + 3);
+    doc.text(`Phone: ${order.customerPhone || order.user?.phone || 'N/A'}`);
+    if (order.user?.email) {
+      doc.text(`Email: ${order.user.email}`);
     }
 
-    doc.moveDown();
-    doc.text('---------------------------------------------------------------------------------------------------');
-    doc.moveDown(0.5);
+    // Address formatting
+    const addressParts = [];
+    if (order.address?.roomNumber) addressParts.push(`Room: ${order.address.roomNumber}`);
+    if (order.address?.hostelName) addressParts.push(order.address.hostelName);
+    if (order.address?.fullAddress) addressParts.push(order.address.fullAddress);
+    if (order.address?.landmark) addressParts.push(`Near ${order.address.landmark}`);
+    const fullAddr = addressParts.length > 0 ? addressParts.join(', ') : (order.address?.fullAddress || 'Campus Delivery Address');
+    doc.text(`Delivery Address: ${fullAddr}`, 40, doc.y, { width: 240 });
+    const customerBottomY = doc.y;
 
-    // Summary Totals
-    doc.text(`Subtotal: INR ${order.subtotal.toFixed(2)}`, 360);
-    doc.text(`Delivery Fee: INR ${order.deliveryFee.toFixed(2)}`, 360);
-    if (order.discount > 0) doc.text(`Discount: -INR ${order.discount.toFixed(2)}`, 360);
-    doc.fontSize(11).fillColor('#10b981').text(`TOTAL PAID: INR ${order.totalAmount.toFixed(2)}`, 360);
-    doc.moveDown(1.5);
+    // Shop Box (Right Column, x=310, width=245)
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#0284c7').text('SHOP DETAILS', 310, metaTopY);
+    doc.font('Helvetica').fontSize(9).fillColor('#0f172a');
+    doc.text(`Shop Name: ${order.shop?.name || 'Campus Partner Shop'}`, 310, doc.y + 3);
+    doc.text(`Shop Phone: ${order.shop?.phone || 'N/A'}`, 310);
+    doc.text(`Shop Address: ${order.shop?.address || 'Campus Location'}`, 310, doc.y, { width: 245 });
+    const shopBottomY = doc.y;
 
-    // Payment Meta
-    doc.fontSize(10).fillColor('#334155');
-    doc.text(`Payment Method: ${order.paymentMethod}`);
-    doc.text(`Payment Status: VERIFIED`);
+    doc.y = Math.max(customerBottomY, shopBottomY) + 12;
+
+    // --- Order & Payment Status Badge Box ---
+    const statusBoxY = doc.y;
+    doc.rect(40, statusBoxY, 515, 26).fill('#f8fafc');
+    doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(40, statusBoxY, 515, 26).stroke();
+
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
+    doc.text(`Order Status: `, 48, statusBoxY + 8, { continued: true });
+    doc.font('Helvetica').fillColor('#0f172a').text(`${order.orderStatus || 'PLACED'}`, { continued: true });
+
+    doc.font('Helvetica-Bold').fillColor('#475569').text(`   |   Payment Method: `, { continued: true });
+    doc.font('Helvetica').fillColor('#0f172a').text(`${order.paymentMethod || 'COD'}`, { continued: true });
+
+    doc.font('Helvetica-Bold').fillColor('#475569').text(`   |   Payment Status: `, { continued: true });
+    const isPaid = order.paymentStatus === 'PAID';
+    const statusColor = isPaid ? '#10b981' : order.paymentStatus === 'FAILED' ? '#ef4444' : '#d97706';
+    doc.font('Helvetica-Bold').fillColor(statusColor).text(`${order.paymentStatus || 'PENDING'}`);
+
+    doc.y = statusBoxY + 36;
+
+    // --- Item Details Table ---
+    const drawTableHeader = () => {
+      const headerY = doc.y;
+      doc.rect(40, headerY, 515, 20).fill('#0284c7');
+      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
+      doc.text('Item Description', 48, headerY + 5, { width: 235 });
+      doc.text('Qty', 290, headerY + 5, { width: 45, align: 'center' });
+      doc.text('Unit Price', 340, headerY + 5, { width: 85, align: 'right' });
+      doc.text('Subtotal', 435, headerY + 5, { width: 110, align: 'right' });
+      doc.y = headerY + 22;
+    };
+
+    drawTableHeader();
+
+    const items = order.items && order.items.length > 0 ? order.items : [];
+    items.forEach((item, index) => {
+      const itemDesc = item.name || 'Product Item';
+      const itemHeight = Math.max(doc.heightOfString(itemDesc, { width: 235 }), 16);
+
+      // Page break check if row exceeds printable height
+      if (doc.y + itemHeight > 710) {
+        doc.addPage();
+        drawTableHeader();
+      }
+
+      const rowY = doc.y;
+      if (index % 2 === 1) {
+        doc.rect(40, rowY, 515, itemHeight + 4).fill('#f8fafc');
+      }
+
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica');
+      doc.text(itemDesc, 48, rowY + 2, { width: 235 });
+      doc.text(String(item.quantity || 1), 290, rowY + 2, { width: 45, align: 'center' });
+      doc.text(`INR ${Number(item.price || 0).toFixed(2)}`, 340, rowY + 2, { width: 85, align: 'right' });
+      doc.text(`INR ${Number(item.subtotal || 0).toFixed(2)}`, 435, rowY + 2, { width: 110, align: 'right' });
+
+      doc.y = rowY + itemHeight + 4;
+    });
+
+    doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+    doc.moveDown(0.8);
+
+    // --- Summary Totals Section ---
+    if (doc.y + 130 > 730) {
+      doc.addPage();
+    }
+
+    const subtotal = Number(order.subtotal || 0);
+    const deliveryFee = Number(order.deliveryFee || 0);
+    const packingCharges = Number(order.packingCharges || 0);
+    const gstAmount = Number(order.gstAmount || 0);
+    const discount = Number(order.discount || 0);
+    const totalAmount = Number(order.totalAmount || 0);
+
+    const summaryStartX = 320;
+    const summaryValX = 450;
+    const valWidth = 95;
+
+    doc.fontSize(9).font('Helvetica').fillColor('#475569');
+
+    // Subtotal
+    doc.text('Items Subtotal:', summaryStartX, doc.y, { width: 125, align: 'right' });
+    doc.fillColor('#0f172a').text(`INR ${subtotal.toFixed(2)}`, summaryValX, doc.y - 10, { width: valWidth, align: 'right' });
+
+    // Delivery Fee
+    doc.fillColor('#475569').text('Delivery Charges:', summaryStartX, doc.y + 3, { width: 125, align: 'right' });
+    doc.fillColor('#0f172a').text(`INR ${deliveryFee.toFixed(2)}`, summaryValX, doc.y - 10, { width: valWidth, align: 'right' });
+
+    // Packaging Charges (if applicable)
+    if (packingCharges > 0) {
+      doc.fillColor('#475569').text('Packaging Charges:', summaryStartX, doc.y + 3, { width: 125, align: 'right' });
+      doc.fillColor('#0f172a').text(`INR ${packingCharges.toFixed(2)}`, summaryValX, doc.y - 10, { width: valWidth, align: 'right' });
+    }
+
+    // Taxes / GST (if applicable)
+    if (gstAmount > 0) {
+      doc.fillColor('#475569').text('GST / Taxes:', summaryStartX, doc.y + 3, { width: 125, align: 'right' });
+      doc.fillColor('#0f172a').text(`INR ${gstAmount.toFixed(2)}`, summaryValX, doc.y - 10, { width: valWidth, align: 'right' });
+    }
+
+    // Discounts / Coupons (if applicable)
+    if (discount > 0) {
+      doc.fillColor('#475569').text('Discount Deducted:', summaryStartX, doc.y + 3, { width: 125, align: 'right' });
+      doc.fillColor('#10b981').text(`-INR ${discount.toFixed(2)}`, summaryValX, doc.y - 10, { width: valWidth, align: 'right' });
+    }
+
+    doc.moveDown(0.6);
+
+    // Total Amount Highlight Box
+    const totalBoxY = doc.y;
+    const boxColor = isPaid ? '#f0fdf4' : '#f8fafc';
+    const borderColor = isPaid ? '#86efac' : '#cbd5e1';
+    const textColor = isPaid ? '#15803d' : '#0369a1';
+
+    doc.rect(summaryStartX - 10, totalBoxY, 245, 26).fill(boxColor);
+    doc.strokeColor(borderColor).lineWidth(1).rect(summaryStartX - 10, totalBoxY, 245, 26).stroke();
+
+    const totalLabel = isPaid ? 'TOTAL PAID:' : 'TOTAL PAYABLE:';
+    doc.fontSize(11).font('Helvetica-Bold').fillColor(textColor);
+    doc.text(totalLabel, summaryStartX, totalBoxY + 7, { width: 125, align: 'right' });
+    doc.text(`INR ${totalAmount.toFixed(2)}`, summaryValX, totalBoxY + 7, { width: valWidth, align: 'right' });
+
+    doc.y = totalBoxY + 36;
+
+    // --- Payment Reference Details ---
+    doc.fontSize(9).font('Helvetica').fillColor('#475569');
+    if (payment?.transactionId) {
+      doc.text(`Payment Reference / UTR: ${payment.transactionId}`);
+    }
     if (order.upiQrSnapshot?.upiId) {
-      doc.text(`UPI ID: ${order.upiQrSnapshot.upiId}`);
+      doc.text(`Shop UPI ID: ${order.upiQrSnapshot.upiId}`);
     }
-    doc.text(`Payment Reference: ${payment?.transactionId || 'Not provided'}`);
+    if (payment?.verifiedAt) {
+      doc.text(`Payment Verification Timestamp: ${new Date(payment.verifiedAt).toLocaleString('en-IN')}`);
+    }
 
-    doc.moveDown(2);
-    doc.fontSize(9).fillColor('#64748b').text('Thank you for ordering with CampusCart!', { align: 'center' });
-    doc.text('This is an official computer-generated receipt.', { align: 'center' });
+    doc.moveDown(1.5);
+    doc.fontSize(8.5).fillColor('#64748b').text('Thank you for ordering with NearCart! Hyperlocal Campus Delivery.', { align: 'center' });
+    doc.text('This is an official computer-generated receipt. No physical signature is required.', { align: 'center' });
+
+    // --- Page Numbering on all buffered pages ---
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(
+        `Page ${i + 1} of ${range.count}  •  NearCart Official Receipt  •  Order #${order.orderNumber || order._id}`,
+        40,
+        doc.page.height - 30,
+        { align: 'center', width: doc.page.width - 80, lineBreak: false }
+      );
+    }
 
     doc.end();
   } catch (error) {
