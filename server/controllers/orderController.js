@@ -962,7 +962,9 @@ export const getOrderById = async (req, res) => {
     }
 
     // Authorization check: Student can only view their own orders
-    if (req.user.role === 'STUDENT' && order.user.toString() !== req.user._id.toString()) {
+    // Ensure proper comparison whether 'order.user' is populated or raw ObjectId
+    const orderUserId = order.user && order.user._id ? order.user._id.toString() : order.user?.toString();
+    if (req.user.role === 'STUDENT' && orderUserId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized access to order details',
