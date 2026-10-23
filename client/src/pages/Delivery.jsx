@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import api from '../services/api';
@@ -7,6 +8,27 @@ import { Truck, CheckCircle2, Clock, AlertCircle, MapPin, Package, RefreshCw, Ar
 export default function Delivery() {
   const { user, updateUser } = useAuth();
   const { socket: globalSocket } = useNotifications();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab')?.toUpperCase();
+  const [activeTab, setActiveTab] = useState(urlTab || 'ALL');
+
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab);
+    } else {
+      setActiveTab('ALL');
+    }
+  }, [urlTab]);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'ALL') {
+      searchParams.delete('tab');
+      setSearchParams(searchParams);
+    } else {
+      setSearchParams({ tab: tabId });
+    }
+  };
 
   const [availableDeliveries, setAvailableDeliveries] = useState([]);
   const [myDeliveries, setMyDeliveries] = useState([]);
@@ -387,8 +409,31 @@ export default function Delivery() {
         </div>
       </div>
 
+      {/* Navigation Filter Tabs */}
+      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        {[
+          { id: 'ALL', label: 'All Jobs', icon: Truck },
+          { id: 'AVAILABLE', label: `Available (${availableDeliveries.length})`, icon: Package },
+          { id: 'ASSIGNED', label: `My Deliveries (${assignedCount + activeCount})`, icon: Clock },
+          { id: 'HISTORY', label: `History (${completedDeliveries.length})`, icon: CheckCircle2 },
+          { id: 'REVIEWS', label: 'Feedback', icon: Star },
+        ].map((tab) => {
+          const IconComponent = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
+            >
+              <IconComponent size={15} /> {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Active Delivery Focus Card */}
-      {activeDelivery && activeDelivery.order && (
+      {activeDelivery && activeDelivery.order && (activeTab === 'ALL' || activeTab === 'ASSIGNED') && (
         <div className="glass-card" style={{ padding: '2rem', marginBottom: '2.5rem', border: '2px solid var(--primary)', background: '#ffffff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -486,7 +531,8 @@ export default function Delivery() {
       )}
 
       {/* Available Deliveries Section */}
-      <div className="glass-card" style={{ padding: '2rem', marginBottom: '2.5rem' }}>
+      {(activeTab === 'ALL' || activeTab === 'AVAILABLE') && (
+        <div className="glass-card" style={{ padding: '2rem', marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
           <Package style={{ color: 'var(--primary)' }} size={22} />
           <h3 style={{ fontSize: '1.3rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
@@ -575,9 +621,11 @@ export default function Delivery() {
           </div>
         )}
       </div>
+      )}
 
       {/* My Assigned Deliveries Roster Section */}
-      <div className="glass-card" style={{ padding: '2rem', marginBottom: '2.5rem' }}>
+      {(activeTab === 'ALL' || activeTab === 'ASSIGNED') && (
+        <div className="glass-card" style={{ padding: '2rem', marginBottom: '2.5rem' }}>
         <h3 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
           My Active & Pending Roster ({myDeliveries.filter((d) => d.status !== 'DELIVERED').length})
         </h3>
@@ -705,9 +753,11 @@ export default function Delivery() {
           </div>
         )}
       </div>
+      )}
 
       {/* Completed Delivery History Section */}
-      <div className="glass-card" style={{ padding: '2rem' }}>
+      {(activeTab === 'ALL' || activeTab === 'HISTORY') && (
+        <div className="glass-card" style={{ padding: '2rem' }}>
         <h3 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
           Delivery History ({completedDeliveries.length})
         </h3>
@@ -759,9 +809,11 @@ export default function Delivery() {
           </div>
         )}
       </div>
+      )}
 
       {/* Recent Delivery Reviews Section */}
-      <div className="glass-card" style={{ padding: '2rem', marginTop: '2.5rem' }}>
+      {(activeTab === 'ALL' || activeTab === 'REVIEWS') && (
+        <div className="glass-card" style={{ padding: '2rem', marginTop: '2.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -827,6 +879,7 @@ export default function Delivery() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

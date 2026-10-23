@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import api from '../services/api';
@@ -42,7 +43,27 @@ import {
 
 export default function Shopkeeper() {
   const { user, refreshUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('DASHBOARD');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(() => (urlTab ? urlTab.toUpperCase() : 'DASHBOARD'));
+
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab.toUpperCase());
+    } else {
+      setActiveTab('DASHBOARD');
+    }
+  }, [urlTab]);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'DASHBOARD') {
+      searchParams.delete('tab');
+      setSearchParams(searchParams);
+    } else {
+      setSearchParams({ tab: tabId });
+    }
+  };
 
   const [shops, setShops] = useState([]);
   const [selectedShopId, setSelectedShopId] = useState('');
@@ -907,7 +928,7 @@ export default function Shopkeeper() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
                   style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
                 >

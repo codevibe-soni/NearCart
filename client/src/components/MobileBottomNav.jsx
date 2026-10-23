@@ -1,20 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { House, Store, Info, ShoppingCart, CircleUserRound } from 'lucide-react';
+import {
+  House,
+  Store,
+  Info,
+  ShoppingCart,
+  CircleUserRound,
+  LayoutDashboard,
+  Package,
+  ShoppingBag,
+  Star,
+  Users,
+  DollarSign,
+  Truck,
+  Clock,
+  CheckCircle2,
+  LogIn,
+  UserPlus,
+  ClipboardList,
+} from 'lucide-react';
 import api from '../services/api';
 
 export default function MobileBottomNav() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [cartCount, setCartCount] = useState(0);
+  const location = useLocation();
 
   // Fetch live cart item count for students
   useEffect(() => {
     if (isAuthenticated && user?.role === 'STUDENT') {
-      api.get('/cart')
+      api
+        .get('/cart')
         .then((res) => {
           if (res && res.success && res.data && res.data.items) {
-            const count = res.data.items.reduce((acc, item) => acc + (item.quantity || 1), 0);
+            const count = res.data.items.reduce(
+              (acc, item) => acc + (item.quantity || 1),
+              0
+            );
             setCartCount(count);
           }
         })
@@ -22,13 +45,229 @@ export default function MobileBottomNav() {
     } else {
       setCartCount(0);
     }
-  }, [isAuthenticated, user?.role]);
+  }, [isAuthenticated, user?.role, location.pathname]);
+
+  // Read current query param ?tab=
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
+  const currentTab = searchParams.get('tab')?.toUpperCase() || null;
+
+  // Compute navigation items based on current authenticated role
+  const navItems = useMemo(() => {
+    if (!isAuthenticated || !user) {
+      return [
+        {
+          to: '/',
+          label: 'Home',
+          icon: House,
+          isActive: (path) => path === '/',
+        },
+        {
+          to: '/about',
+          label: 'About',
+          icon: Info,
+          isActive: (path) => path.startsWith('/about'),
+        },
+        {
+          to: '/login',
+          label: 'Login',
+          icon: LogIn,
+          isActive: (path) => path.startsWith('/login'),
+        },
+        {
+          to: '/register',
+          label: 'Register',
+          icon: UserPlus,
+          isActive: (path) => path.startsWith('/register'),
+        },
+      ];
+    }
+
+    switch (user.role) {
+      case 'STUDENT':
+        return [
+          {
+            to: '/',
+            label: 'Home',
+            icon: House,
+            isActive: (path) => path === '/',
+          },
+          {
+            to: '/student',
+            label: 'Shops',
+            icon: Store,
+            isActive: (path) => path.startsWith('/student'),
+          },
+          {
+            to: '/cart',
+            label: 'Cart',
+            icon: ShoppingCart,
+            hasBadge: true,
+            isActive: (path) =>
+              path.startsWith('/cart') || path.startsWith('/checkout'),
+          },
+          {
+            to: '/orders',
+            label: 'Orders',
+            icon: ClipboardList,
+            isActive: (path) => path.startsWith('/orders'),
+          },
+          {
+            to: '/profile',
+            label: 'Profile',
+            icon: CircleUserRound,
+            isActive: (path) => path.startsWith('/profile'),
+          },
+        ];
+
+      case 'SHOPKEEPER':
+        return [
+          {
+            to: '/shopkeeper',
+            label: 'Dashboard',
+            icon: LayoutDashboard,
+            isActive: (path, tab) =>
+              path === '/shopkeeper' && (!tab || tab === 'DASHBOARD'),
+          },
+          {
+            to: '/shopkeeper?tab=PRODUCTS',
+            label: 'Products',
+            icon: Package,
+            isActive: (path, tab) =>
+              path === '/shopkeeper' &&
+              (tab === 'PRODUCTS' || tab === 'INVENTORY'),
+          },
+          {
+            to: '/shopkeeper?tab=ORDERS',
+            label: 'Orders',
+            icon: ShoppingBag,
+            isActive: (path, tab) =>
+              (path === '/shopkeeper' && tab === 'ORDERS') ||
+              path.startsWith('/orders'),
+          },
+          {
+            to: '/shopkeeper?tab=REVIEWS',
+            label: 'Reviews',
+            icon: Star,
+            isActive: (path, tab) => path === '/shopkeeper' && tab === 'REVIEWS',
+          },
+          {
+            to: '/profile',
+            label: 'Profile',
+            icon: CircleUserRound,
+            isActive: (path, tab) =>
+              path.startsWith('/profile') ||
+              (path === '/shopkeeper' && tab === 'PROFILE'),
+          },
+        ];
+
+      case 'ADMIN':
+        return [
+          {
+            to: '/admin',
+            label: 'Dashboard',
+            icon: LayoutDashboard,
+            isActive: (path, tab) =>
+              path === '/admin' && (!tab || tab === 'STAFF_CREATE'),
+          },
+          {
+            to: '/admin?tab=USER_MANAGEMENT',
+            label: 'Users',
+            icon: Users,
+            isActive: (path, tab) =>
+              path === '/admin' && tab === 'USER_MANAGEMENT',
+          },
+          {
+            to: '/admin?tab=SHOP_MANAGEMENT',
+            label: 'Shops',
+            icon: Store,
+            isActive: (path, tab) =>
+              path === '/admin' && tab === 'SHOP_MANAGEMENT',
+          },
+          {
+            to: '/admin?tab=PAYMENT_MANAGEMENT',
+            label: 'Payments',
+            icon: DollarSign,
+            isActive: (path, tab) =>
+              path === '/admin' && tab === 'PAYMENT_MANAGEMENT',
+          },
+          {
+            to: '/profile',
+            label: 'Profile',
+            icon: CircleUserRound,
+            isActive: (path) => path.startsWith('/profile'),
+          },
+        ];
+
+      case 'DELIVERY_BOY':
+        return [
+          {
+            to: '/delivery',
+            label: 'Dashboard',
+            icon: Truck,
+            isActive: (path, tab) =>
+              path === '/delivery' && (!tab || tab === 'ALL'),
+          },
+          {
+            to: '/delivery?tab=AVAILABLE',
+            label: 'Available',
+            icon: Package,
+            isActive: (path, tab) =>
+              path === '/delivery' && tab === 'AVAILABLE',
+          },
+          {
+            to: '/delivery?tab=ASSIGNED',
+            label: 'Assigned',
+            icon: Clock,
+            isActive: (path, tab) =>
+              (path === '/delivery' && tab === 'ASSIGNED') ||
+              path.startsWith('/orders'),
+          },
+          {
+            to: '/delivery?tab=HISTORY',
+            label: 'History',
+            icon: CheckCircle2,
+            isActive: (path, tab) => path === '/delivery' && tab === 'HISTORY',
+          },
+          {
+            to: '/profile',
+            label: 'Profile',
+            icon: CircleUserRound,
+            isActive: (path) => path.startsWith('/profile'),
+          },
+        ];
+
+      default:
+        return [
+          {
+            to: '/',
+            label: 'Home',
+            icon: House,
+            isActive: (path) => path === '/',
+          },
+          {
+            to: '/about',
+            label: 'About',
+            icon: Info,
+            isActive: (path) => path.startsWith('/about'),
+          },
+          {
+            to: '/profile',
+            label: 'Profile',
+            icon: CircleUserRound,
+            isActive: (path) => path.startsWith('/profile'),
+          },
+        ];
+    }
+  }, [isAuthenticated, user]);
 
   return (
     <>
       <nav
         className="bottom-nav-bar"
-        aria-label="NearCart Navigation"
+        aria-label="NearCart Role Navigation"
         style={{
           position: 'fixed',
           bottom: 0,
@@ -40,7 +279,7 @@ export default function MobileBottomNav() {
           flexDirection: 'row',
           justifyContent: 'center',
           alignItems: 'center',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
         }}
       >
         <div
@@ -52,114 +291,46 @@ export default function MobileBottomNav() {
             justifyContent: 'space-around',
             alignItems: 'center',
             width: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
           }}
         >
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-            title="Home"
-            aria-label="Home"
-            style={{
-              flex: '1 1 0',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="bottom-nav-icon-wrapper">
-              <House size={19} strokeWidth={2} className="bottom-nav-icon" />
-            </div>
-            <span className="bottom-nav-label">Home</span>
-          </NavLink>
+          {navItems.map((item) => {
+            const IconComponent = item.icon;
+            const active = item.isActive(location.pathname, currentTab);
 
-          <NavLink
-            to="/student"
-            className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-            title="Shop"
-            aria-label="Shop"
-            style={{
-              flex: '1 1 0',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="bottom-nav-icon-wrapper">
-              <Store size={19} strokeWidth={2} className="bottom-nav-icon" />
-            </div>
-            <span className="bottom-nav-label">Shop</span>
-          </NavLink>
-
-          <NavLink
-            to="/about"
-            className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-            title="About NearCart"
-            aria-label="About NearCart"
-            style={{
-              flex: '1 1 0',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="bottom-nav-icon-wrapper">
-              <Info size={19} strokeWidth={2} className="bottom-nav-icon" />
-            </div>
-            <span className="bottom-nav-label">About</span>
-          </NavLink>
-
-          <NavLink
-            to="/cart"
-            className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-            title="Cart"
-            aria-label="Cart"
-            style={{
-              flex: '1 1 0',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="bottom-nav-icon-wrapper">
-              <ShoppingCart size={19} strokeWidth={2} className="bottom-nav-icon" />
-              {cartCount > 0 && (
-                <span className="bottom-nav-cart-badge" aria-live="polite">
-                  {cartCount > 99 ? '99+' : cartCount}
-                </span>
-              )}
-            </div>
-            <span className="bottom-nav-label">Cart</span>
-          </NavLink>
-
-          <NavLink
-            to="/profile"
-            className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-            title="Profile"
-            aria-label="Profile"
-            style={{
-              flex: '1 1 0',
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="bottom-nav-icon-wrapper">
-              <CircleUserRound size={19} strokeWidth={2} className="bottom-nav-icon" />
-            </div>
-            <span className="bottom-nav-label">Profile</span>
-          </NavLink>
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={`bottom-nav-item ${active ? 'active' : ''}`}
+                title={item.label}
+                aria-label={item.label}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div className="bottom-nav-icon-wrapper">
+                  <IconComponent
+                    size={19}
+                    strokeWidth={2}
+                    className="bottom-nav-icon"
+                  />
+                  {item.hasBadge && cartCount > 0 && (
+                    <span className="bottom-nav-cart-badge" aria-live="polite">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </div>
+                <span className="bottom-nav-label">{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
 
         <style>{`

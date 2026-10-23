@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import {
@@ -22,7 +23,27 @@ import {
 
 export default function Admin() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('STAFF_CREATE');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(() => (urlTab ? urlTab.toUpperCase() : 'STAFF_CREATE'));
+
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab.toUpperCase());
+    } else {
+      setActiveTab('STAFF_CREATE');
+    }
+  }, [urlTab]);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    if (tabId === 'STAFF_CREATE') {
+      searchParams.delete('tab');
+      setSearchParams(searchParams);
+    } else {
+      setSearchParams({ tab: tabId });
+    }
+  };
 
   // Staff Creation Form State
   const [staffTab, setStaffTab] = useState('SHOPKEEPER');
@@ -282,37 +303,37 @@ export default function Admin() {
       {/* Main Navigation Tabs */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <button
-          onClick={() => setActiveTab('STAFF_CREATE')}
+          onClick={() => handleTabChange('STAFF_CREATE')}
           className={activeTab === 'STAFF_CREATE' ? 'btn-primary' : 'btn-secondary'}
         >
           <UserPlus size={18} /> Staff Onboarding
         </button>
         <button
-          onClick={() => setActiveTab('USER_MANAGEMENT')}
+          onClick={() => handleTabChange('USER_MANAGEMENT')}
           className={activeTab === 'USER_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}
         >
           <Users size={18} /> User Access & Block Controls
         </button>
         <button
-          onClick={() => setActiveTab('SHOP_MANAGEMENT')}
+          onClick={() => handleTabChange('SHOP_MANAGEMENT')}
           className={activeTab === 'SHOP_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}
         >
           <Store size={18} /> Shops & Hotels Management
         </button>
         <button
-          onClick={() => setActiveTab('PAYMENT_MANAGEMENT')}
+          onClick={() => handleTabChange('PAYMENT_MANAGEMENT')}
           className={activeTab === 'PAYMENT_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}
         >
           <CreditCard size={18} /> Payment Management
         </button>
         <button
-          onClick={() => setActiveTab('REVIEWS_MANAGEMENT')}
+          onClick={() => handleTabChange('REVIEWS_MANAGEMENT')}
           className={activeTab === 'REVIEWS_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}
         >
           <Star size={18} /> Reviews Moderation
         </button>
         <button
-          onClick={() => setActiveTab('CLEAN_DATA')}
+          onClick={() => handleTabChange('CLEAN_DATA')}
           className={activeTab === 'CLEAN_DATA' ? 'btn-primary' : 'btn-secondary'}
           style={{
             background: activeTab === 'CLEAN_DATA' ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : undefined,

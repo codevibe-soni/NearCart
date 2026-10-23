@@ -673,7 +673,7 @@ export default function MainLayout() {
       `}</style>
 
       {/* Main Outlet with bottom clearance for fixed navigation */}
-      <main className="main-content-layout" style={{ flex: 1, paddingBottom: '4rem' }}>
+      <main className="main-content-layout" style={{ flex: 1, paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))' }}>
         <Outlet />
       </main>
 
