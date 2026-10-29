@@ -21,6 +21,7 @@ import {
   Store,
 } from 'lucide-react';
 
+import CampaignManagement from '../components/CampaignManagement.jsx';
 export default function Admin() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -343,11 +344,15 @@ export default function Admin() {
         >
           🧹 Clean App Data
         </button>
+<button onClick={() => handleTabChange('CAMPAIGN_MANAGEMENT')} className={activeTab === 'CAMPAIGN_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}>
+  <TrendingUp size={18} /> Campaign Management
+</button>
       </div>
 
       {activeTab === 'SHOP_MANAGEMENT' && <AdminShopsTab />}
 
       {activeTab === 'CLEAN_DATA' && <AdminCleanDataTab onDataCleaned={() => { fetchUsers(); fetchPayments(); }} />}
+{activeTab === 'CAMPAIGN_MANAGEMENT' && <CampaignManagement />}
 
       {activeTab === 'REVIEWS_MANAGEMENT' && <AdminReviewsTab />}
 
