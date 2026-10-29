@@ -82,6 +82,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // New field for promotional consent (opt‑in for marketing pushes)
+    promoConsent: {
+      type: Boolean,
+      default: false,
+    },
     pushTokens: [
       {
         token: { type: String, required: true },

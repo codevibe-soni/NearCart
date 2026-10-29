@@ -21,5 +21,7 @@ router.patch('/:id/read', markAsRead);
 router.post('/device-token', registerDeviceToken);
 router.delete('/device-token', removeDeviceToken);
 router.post('/test-push', sendTestPushNotification);
+// Admin route to trigger Karwa Chauth promotional push (single-use)
+router.post('/karwa-chooth-promo', authorizeRoles('ADMIN'), sendKarwaChauthPromo);
 
 export default router;

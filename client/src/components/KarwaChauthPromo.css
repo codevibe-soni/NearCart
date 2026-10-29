@@ -1,0 +1,88 @@
+ .karwa-promo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.karwa-promo-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.4s ease-out forwards;
+  pointer-events: auto;
+}
+
+.karwa-promo-content {
+  position: relative;
+  background: linear-gradient(135deg, #a70d0d, #e6a500);
+  color: #fff;
+  padding: 2rem 1.5rem;
+  border-radius: 1rem;
+  max-width: 90vw;
+  width: 420px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  animation: slideUp 0.5s ease-out forwards;
+  pointer-events: auto;
+}
+
+.karwa-promo-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.karwa-promo-visuals {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.karwa-promo-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 1.3rem;
+  margin-bottom: 1.5rem;
+}
+
+.karwa-promo-cta {
+  background: #fff;
+  color: #a70d0d;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-weight: bold;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.karwa-promo-cta:hover {
+  background: #f0f0f0;
+  transform: translateY(-2px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .karwa-promo-backdrop,
+  .karwa-promo-content {
+    animation: none !important;
+  }
+}
