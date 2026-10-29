@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import {
   getUserNotifications,
   getUnreadCount,
@@ -8,6 +8,7 @@ import {
   registerDeviceToken,
   removeDeviceToken,
   sendTestPushNotification,
+  sendKarwaChauthPromo,
 } from '../controllers/notificationController.js';
 
 const router = express.Router();
