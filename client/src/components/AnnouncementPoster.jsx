@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { X, Megaphone } from 'lucide-react';
+import { Megaphone } from 'lucide-react';
 import './AnnouncementPoster.css';
 
 export default function AnnouncementPoster({ portal = 'STUDENT' }) {
   const [announcements, setAnnouncements] = useState([]);
-  const [dismissedIds, setDismissedIds] = useState(() => {
-    try {
-      const stored = sessionStorage.getItem(`nearcart_dismissed_posters_${portal}`);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
 
   useEffect(() => {
     let isMounted = true;
@@ -44,47 +36,24 @@ export default function AnnouncementPoster({ portal = 'STUDENT' }) {
     };
   }, [portal]);
 
-  const handleDismiss = (id) => {
-    setDismissedIds((prev) => {
-      const updated = [...prev, id];
-      try {
-        sessionStorage.setItem(`nearcart_dismissed_posters_${portal}`, JSON.stringify(updated));
-      } catch {
-        // Ignore storage errors
-      }
-      return updated;
-    });
-  };
-
-  const visiblePosters = announcements.filter((a) => !dismissedIds.includes(a._id));
-
-  if (visiblePosters.length === 0) {
+  if (!announcements || announcements.length === 0) {
     return null;
   }
 
   return (
     <div className="portal-announcement-container" role="region" aria-label="Portal Announcements">
-      {visiblePosters.map((item) => {
+      {announcements.map((item) => {
         const img = item.imageUrl || item.posterUrl;
         const title = item.title || item.name || '';
         const message = item.message || '';
 
         return (
           <div key={item._id} className="portal-announcement-card">
-            <button
-              className="portal-announcement-dismiss"
-              onClick={() => handleDismiss(item._id)}
-              aria-label="Dismiss announcement banner"
-              title="Dismiss banner"
-            >
-              <X size={16} />
-            </button>
-
             {img && (
               <div className="portal-announcement-img-wrap">
                 <img
                   src={img}
-                  alt={title || 'Announcement'}
+                  alt={title || 'Announcement Poster'}
                   className="portal-announcement-img"
                   onError={(e) => {
                     e.target.parentElement.style.display = 'none';

@@ -42,6 +42,9 @@ async function runTests() {
       isActive: true,
       isVerified: true,
     });
+  } else if (!admin.isActive) {
+    admin.isActive = true;
+    await admin.save();
   }
   const adminToken = generateToken(admin);
 
@@ -58,8 +61,49 @@ async function runTests() {
       isActive: true,
       isVerified: true,
     });
+  } else if (!student.isActive) {
+    student.isActive = true;
+    await student.save();
   }
   const studentToken = generateToken(student);
+
+  // Find or create test Shopkeeper user
+  let shopkeeper = await User.findOne({ role: 'SHOPKEEPER' });
+  if (!shopkeeper) {
+    shopkeeper = await User.create({
+      name: 'Test Shopkeeper',
+      email: 'shopkeeper_test@campuscart.com',
+      phone: '9999900003',
+      password: 'ShopkeeperPassword123!',
+      role: 'SHOPKEEPER',
+      accountStatus: 'APPROVED',
+      isActive: true,
+      isVerified: true,
+    });
+  } else if (!shopkeeper.isActive) {
+    shopkeeper.isActive = true;
+    await shopkeeper.save();
+  }
+  const shopkeeperToken = generateToken(shopkeeper);
+
+  // Find or create test Delivery Boy user
+  let deliveryBoy = await User.findOne({ role: 'DELIVERY_BOY' });
+  if (!deliveryBoy) {
+    deliveryBoy = await User.create({
+      name: 'Test Delivery Partner',
+      email: 'delivery_test@campuscart.com',
+      phone: '9999900004',
+      password: 'DeliveryPassword123!',
+      role: 'DELIVERY_BOY',
+      accountStatus: 'APPROVED',
+      isActive: true,
+      isVerified: true,
+    });
+  } else if (!deliveryBoy.isActive) {
+    deliveryBoy.isActive = true;
+    await deliveryBoy.save();
+  }
+  const deliveryToken = generateToken(deliveryBoy);
 
   let createdAnnouncementId = null;
 
@@ -319,22 +363,88 @@ async function runTests() {
     console.log('   ✓ PASS: Unpublished announcement is completely hidden from public view');
 
     // ----------------------------------------------------
-    // TEST 10: Delete Announcement
+    // TEST 10: Delete Authorization Enforcement (Only Admin Can Delete)
     // ----------------------------------------------------
-    console.log('\n[TEST 10] Deleting Announcement and MongoDB Record Removal');
-    const deleteRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+    console.log('\n[TEST 10] Deleting Announcement Authorization (Only Admin can permanently delete)');
+
+    // 1. Unauthenticated delete attempt
+    const unauthDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+      method: 'DELETE',
+    });
+    if (unauthDelRes.status !== 401) {
+      throw new Error(`FAIL: Expected 401 for unauthenticated delete attempt, got ${unauthDelRes.status}`);
+    }
+    const docStillExists1 = await Campaign.findById(createdAnnouncementId);
+    if (!docStillExists1) {
+      throw new Error('FAIL: Poster was deleted by unauthenticated request!');
+    }
+    console.log('   ✓ PASS: Unauthenticated delete rejected with 401 (Poster remains in MongoDB)');
+
+    // 2. Student delete attempt
+    const studentDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${studentToken}` },
+    });
+    if (studentDelRes.status !== 403) {
+      throw new Error(`FAIL: Expected 403 for student delete attempt, got ${studentDelRes.status}`);
+    }
+    const docStillExists2 = await Campaign.findById(createdAnnouncementId);
+    if (!docStillExists2) {
+      throw new Error('FAIL: Poster was deleted by student request!');
+    }
+    console.log('   ✓ PASS: Student delete rejected with 403 Forbidden (Poster remains in MongoDB)');
+
+    // 3. Shopkeeper delete attempt
+    const skDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${shopkeeperToken}` },
+    });
+    if (skDelRes.status !== 403) {
+      throw new Error(`FAIL: Expected 403 for shopkeeper delete attempt, got ${skDelRes.status}`);
+    }
+    const docStillExists3 = await Campaign.findById(createdAnnouncementId);
+    if (!docStillExists3) {
+      throw new Error('FAIL: Poster was deleted by shopkeeper request!');
+    }
+    console.log('   ✓ PASS: Shopkeeper delete rejected with 403 Forbidden (Poster remains in MongoDB)');
+
+    // 4. Delivery Boy delete attempt
+    const delBoyDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${deliveryToken}` },
+    });
+    if (delBoyDelRes.status !== 403) {
+      throw new Error(`FAIL: Expected 403 for delivery partner delete attempt, got ${delBoyDelRes.status}`);
+    }
+    const docStillExists4 = await Campaign.findById(createdAnnouncementId);
+    if (!docStillExists4) {
+      throw new Error('FAIL: Poster was deleted by delivery partner request!');
+    }
+    console.log('   ✓ PASS: Delivery partner delete rejected with 403 Forbidden (Poster remains in MongoDB)');
+
+    // 5. Attempt delete on public endpoint directly
+    const publicDelRes = await fetch(`${BASE_URL}/announcements/${createdAnnouncementId}`, {
+      method: 'DELETE',
+    });
+    if (publicDelRes.status !== 404) {
+      throw new Error(`FAIL: Expected 404 on public route delete attempt, got ${publicDelRes.status}`);
+    }
+    console.log('   ✓ PASS: Direct public route delete returns 404 (No public delete endpoint)');
+
+    // 6. Admin authorized delete attempt
+    const adminDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${adminToken}` },
     });
-    const deleteData = await deleteRes.json();
-    if (deleteRes.status !== 200 || !deleteData.success) {
-      throw new Error(`FAIL: Deletion failed: ${JSON.stringify(deleteData)}`);
+    const adminDelData = await adminDelRes.json();
+    if (adminDelRes.status !== 200 || !adminDelData.success) {
+      throw new Error(`FAIL: Admin deletion failed: ${JSON.stringify(adminDelData)}`);
     }
     const checkDeleted = await Campaign.findById(createdAnnouncementId);
     if (checkDeleted) {
-      throw new Error('FAIL: Document was not removed from MongoDB');
+      throw new Error('FAIL: Document was not removed from MongoDB after admin delete');
     }
-    console.log('   ✓ PASS: Announcement deleted and confirmed removed from database');
+    console.log('   ✓ PASS: Admin authorized deletion succeeded and document removed from MongoDB');
     createdAnnouncementId = null;
 
     // ----------------------------------------------------
