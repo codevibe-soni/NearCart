@@ -5,7 +5,6 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import SplashScreen from './components/SplashScreen';
-import KarwaChauthPromo from './components/KarwaChauthPromo';
 import Student from './pages/Student';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
@@ -67,7 +66,6 @@ function App() {
   return (
     <>
       <SplashScreen />
-      <KarwaChauthPromo />
       <BrowserRouter>
         <GlobalRouteLoader>
           <Suspense fallback={<PageFallback />}>

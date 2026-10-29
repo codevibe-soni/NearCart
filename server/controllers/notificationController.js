@@ -2,7 +2,6 @@ import Notification from '../models/Notification.js';
 import User from '../models/User.js';
 import { sendPushToTokens, getFirebaseAdminStatus } from '../services/pushNotificationService.js';
 import mongoose from 'mongoose';
-import CampaignLog from '../models/CampaignLog.js';
 
 /**
  * @desc    Get notifications for authenticated user
@@ -282,68 +281,4 @@ export const sendTestPushNotification = async (req, res, next) => {
     next(error);
   }
 };
-export const sendKarwaChauthPromo = async (req, res, next) => {
-  try {
-    // Campaign timing (Asia/Kolkata)
-    const campaignStart = new Date('2026-10-29T00:00:00+05:30');
-    const campaignEnd = new Date('2026-10-30T00:00:00+05:30');
-    const now = new Date();
-
-    if (now < campaignStart) {
-      return res.status(400).json({ success: false, message: 'Campaign has not started yet.' });
-    }
-    if (now > campaignEnd) {
-      return res.status(400).json({ success: false, message: 'Campaign has already expired.' });
-    }
-
-    const campaignName = 'KarwaChauth2026-10-29';
-    // Idempotency: check if already sent
-    const existingLog = await CampaignLog.findOne({ campaignName });
-    if (existingLog) {
-      return res.status(200).json({ success: true, message: 'Campaign already sent.', log: existingLog });
-    }
-
-    // Users who opted in for promotional pushes
-    const users = await User.find({ promoConsent: true, 'pushTokens.isActive': true }).select('pushTokens');
-    const allTokens = [];
-    users.forEach(u => {
-      u.pushTokens
-        .filter(t => t.isActive !== false && t.token)
-        .forEach(t => allTokens.push(t.token));
-    });
-
-    if (allTokens.length === 0) {
-      return res.status(200).json({ success: true, message: 'No eligible devices to send.' });
-    }
-
-    const payload = {
-      title: 'Karwa Chauth Special 🌙',
-      body: 'Celebrate today with discounts up to 20% on NearCart. Open the app to explore the offer!',
-      type: 'PROMO',
-      url: '/',
-    };
-
-    const result = await sendPushToTokens(allTokens, payload, null);
-
-    // Record campaign log for idempotency
-    await CampaignLog.create({
-      campaignName,
-      sentBy: req.user ? req.user._id : null,
-      tokenCount: allTokens.length,
-      successCount: result.sentCount || 0,
-      failureCount: result.failureCount || 0,
-    });
-
-    return res.status(200).json({
-      success: result.success,
-      tokensFound: allTokens.length,
-      sentCount: result.sentCount || 0,
-      failureCount: result.failureCount || 0,
-      errors: result.errors || [],
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
 
