@@ -14,7 +14,23 @@ const campaignSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    // Poster image URL & public ID
+    // Media URL, Type, and Resource Type (supports Image, GIF, Video)
+    mediaUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    mediaType: {
+      type: String,
+      enum: ['image', 'gif', 'video'],
+      default: 'image',
+    },
+    resourceType: {
+      type: String,
+      enum: ['image', 'video', 'raw', 'auto'],
+      default: 'image',
+    },
+    // Backward-compatible fields for existing image posters
     imageUrl: {
       type: String,
       trim: true,
@@ -93,7 +109,20 @@ const campaignSchema = new mongoose.Schema(
   }
 );
 
-// Keep title/name, imageUrl/posterUrl, and isActive/isPublished in sync before saving
+// Helper to determine media type from URL extension
+const inferMediaTypeFromUrl = (url) => {
+  if (!url || typeof url !== 'string') return { mediaType: 'image', resourceType: 'image' };
+  const lower = url.split('?')[0].toLowerCase();
+  if (lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.includes('/video/upload/')) {
+    return { mediaType: 'video', resourceType: 'video' };
+  }
+  if (lower.endsWith('.gif')) {
+    return { mediaType: 'gif', resourceType: 'image' };
+  }
+  return { mediaType: 'image', resourceType: 'image' };
+};
+
+// Keep title/name, mediaUrl/imageUrl/posterUrl, and isActive/isPublished in sync before saving
 campaignSchema.pre('save', function (next) {
   // Sync title and name
   if (this.title && !this.name) {
@@ -102,11 +131,21 @@ campaignSchema.pre('save', function (next) {
     this.title = this.name;
   }
 
-  // Sync imageUrl and posterUrl
-  if (this.imageUrl && !this.posterUrl) {
-    this.posterUrl = this.imageUrl;
-  } else if (this.posterUrl && !this.imageUrl) {
-    this.imageUrl = this.posterUrl;
+  // Sync mediaUrl, imageUrl, and posterUrl
+  const resolvedUrl = this.mediaUrl || this.imageUrl || this.posterUrl || '';
+  if (resolvedUrl) {
+    if (!this.mediaUrl) this.mediaUrl = resolvedUrl;
+    if (!this.imageUrl) this.imageUrl = resolvedUrl;
+    if (!this.posterUrl) this.posterUrl = resolvedUrl;
+
+    // Detect mediaType and resourceType if not set or set to default image
+    if (!this.mediaType || this.mediaType === 'image') {
+      const inferred = inferMediaTypeFromUrl(resolvedUrl);
+      if (inferred.mediaType !== 'image') {
+        this.mediaType = inferred.mediaType;
+        this.resourceType = inferred.resourceType;
+      }
+    }
   }
 
   // Sync isPublished and isActive

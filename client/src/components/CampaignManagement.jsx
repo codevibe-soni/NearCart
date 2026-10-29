@@ -10,6 +10,8 @@ import {
   X,
   Upload,
   Image as ImageIcon,
+  Video as VideoIcon,
+  Sparkles,
   Megaphone,
   CheckCircle2,
   AlertCircle,
@@ -29,14 +31,17 @@ export default function CampaignManagement() {
   // Form states
   const emptyForm = {
     title: '',
+    mediaUrl: '',
     imageUrl: '',
+    mediaType: 'image',
     message: '',
     targetPortals: ['ALL'],
     isActive: true,
   };
   const [form, setForm] = useState(emptyForm);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState('');
+  const [detectedMediaType, setDetectedMediaType] = useState('image');
   const [uploading, setUploading] = useState(false);
 
   const fetchAnnouncements = async () => {
@@ -60,6 +65,19 @@ export default function CampaignManagement() {
     fetchAnnouncements();
   }, []);
 
+  // Helper to determine media type from URL
+  const getMediaType = (url, fallbackType = 'image') => {
+    if (!url) return fallbackType;
+    const lower = url.split('?')[0].toLowerCase();
+    if (lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.includes('/video/upload/')) {
+      return 'video';
+    }
+    if (lower.endsWith('.gif')) {
+      return 'gif';
+    }
+    return fallbackType || 'image';
+  };
+
   const openModal = (announcement = null) => {
     setError('');
     setSuccess('');
@@ -68,18 +86,25 @@ export default function CampaignManagement() {
     if (announcement) {
       setEditing(announcement);
       const portals = announcement.targetPortals?.length ? announcement.targetPortals : ['ALL'];
+      const currentUrl = announcement.mediaUrl || announcement.imageUrl || announcement.posterUrl || '';
+      const mType = announcement.mediaType || getMediaType(currentUrl, 'image');
+
       setForm({
         title: announcement.title || announcement.name || '',
-        imageUrl: announcement.imageUrl || announcement.posterUrl || '',
+        mediaUrl: currentUrl,
+        imageUrl: currentUrl,
+        mediaType: mType,
         message: announcement.message || announcement.bannerText || '',
         targetPortals: portals,
         isActive: announcement.isActive ?? announcement.isPublished ?? true,
       });
-      setImagePreviewUrl(announcement.imageUrl || announcement.posterUrl || '');
+      setMediaPreviewUrl(currentUrl);
+      setDetectedMediaType(mType);
     } else {
       setEditing(null);
       setForm(emptyForm);
-      setImagePreviewUrl('');
+      setMediaPreviewUrl('');
+      setDetectedMediaType('image');
     }
     setShowModal(true);
   };
@@ -89,7 +114,8 @@ export default function CampaignManagement() {
     setEditing(null);
     setForm(emptyForm);
     setSelectedFile(null);
-    setImagePreviewUrl('');
+    setMediaPreviewUrl('');
+    setDetectedMediaType('image');
   };
 
   const handleInputChange = (e) => {
@@ -105,18 +131,36 @@ export default function CampaignManagement() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file (JPEG, PNG, WEBP).');
+    const mime = file.type.toLowerCase();
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    // Check supported types
+    const isVideo = mime === 'video/mp4' || mime === 'video/webm' || ext === 'mp4' || ext === 'webm';
+    const isGif = mime === 'image/gif' || ext === 'gif';
+    const isStaticImage =
+      ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(mime) ||
+      ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+
+    if (!isVideo && !isGif && !isStaticImage) {
+      setError('Unsupported file format. Please upload JPG, PNG, WEBP, GIF images or MP4, WebM videos.');
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image file size must be less than 5MB.');
+    // Size limit validation (Videos: 25MB, Images/GIFs: 5MB)
+    if (isVideo && file.size > 25 * 1024 * 1024) {
+      setError('Video file size exceeds maximum limit of 25MB.');
       return;
     }
 
+    if (!isVideo && file.size > 5 * 1024 * 1024) {
+      setError(`${isGif ? 'GIF' : 'Image'} file size exceeds maximum limit of 5MB.`);
+      return;
+    }
+
+    const mType = isVideo ? 'video' : isGif ? 'gif' : 'image';
     setSelectedFile(file);
-    setImagePreviewUrl(URL.createObjectURL(file));
+    setDetectedMediaType(mType);
+    setMediaPreviewUrl(URL.createObjectURL(file));
     setError('');
   };
 
@@ -128,7 +172,6 @@ export default function CampaignManagement() {
         return { ...prev, targetPortals: ['ALL'] };
       }
 
-      // Remove ALL if selecting specific
       current = current.filter((p) => p !== 'ALL');
 
       if (current.includes(portal)) {
@@ -137,7 +180,6 @@ export default function CampaignManagement() {
         current.push(portal);
       }
 
-      // If all three or none are selected, set to ALL
       const allSpecific = ['STUDENT', 'SHOPKEEPER', 'DELIVERY_BOY'];
       if (current.length === 0 || allSpecific.every((p) => current.includes(p))) {
         return { ...prev, targetPortals: ['ALL'] };
@@ -157,17 +199,20 @@ export default function CampaignManagement() {
       return;
     }
 
-    if (!selectedFile && !form.imageUrl.trim() && !imagePreviewUrl) {
-      setError('A poster image is required. Please choose a file or enter an image URL.');
+    if (!selectedFile && !form.mediaUrl.trim() && !mediaPreviewUrl) {
+      setError('Poster media is required. Please choose an image, GIF, or video file, or enter a media URL.');
       return;
     }
 
     setUploading(true);
 
     try {
-      let finalImageUrl = form.imageUrl.trim();
+      let finalMediaUrl = form.mediaUrl.trim();
+      let finalMediaType = detectedMediaType;
+      let finalResourceType = detectedMediaType === 'video' ? 'video' : 'image';
+      let publicId = '';
 
-      // Upload file to server/Cloudinary if file selected
+      // Upload file to server/Cloudinary if a new file was selected
       if (selectedFile) {
         const formData = new FormData();
         formData.append('poster', selectedFile);
@@ -177,17 +222,27 @@ export default function CampaignManagement() {
         });
 
         if (uploadRes.success && uploadRes.url) {
-          finalImageUrl = uploadRes.url;
+          finalMediaUrl = uploadRes.url;
+          finalMediaType = uploadRes.mediaType || detectedMediaType;
+          finalResourceType = uploadRes.resourceType || (finalMediaType === 'video' ? 'video' : 'image');
+          publicId = uploadRes.publicId || '';
         } else {
-          throw new Error(uploadRes.message || 'Image upload failed');
+          throw new Error(uploadRes.message || 'Media upload failed');
         }
+      } else if (finalMediaUrl) {
+        finalMediaType = getMediaType(finalMediaUrl, detectedMediaType);
+        finalResourceType = finalMediaType === 'video' ? 'video' : 'image';
       }
 
       const payload = {
         title: form.title.trim(),
         name: form.title.trim(),
-        imageUrl: finalImageUrl,
-        posterUrl: finalImageUrl,
+        mediaUrl: finalMediaUrl,
+        mediaType: finalMediaType,
+        resourceType: finalResourceType,
+        imageUrl: finalMediaUrl,
+        posterUrl: finalMediaUrl,
+        imagePublicId: publicId,
         message: form.message.trim(),
         targetPortals: form.targetPortals,
         isActive: form.isActive,
@@ -214,7 +269,7 @@ export default function CampaignManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this poster/announcement? This action cannot be undone.')) return;
+    if (!window.confirm('Permanently delete this poster/announcement? This action cannot be undone.')) return;
     setError('');
     setSuccess('');
     try {
@@ -262,6 +317,13 @@ export default function CampaignManagement() {
     );
   };
 
+  const renderMediaTypeBadge = (mediaType, url) => {
+    const type = mediaType || getMediaType(url, 'image');
+    if (type === 'video') return <span className="badge-media video"><VideoIcon size={11} style={{ verticalAlign: 'middle', marginRight: '2px' }} /> VIDEO</span>;
+    if (type === 'gif') return <span className="badge-media gif"><Sparkles size={11} style={{ verticalAlign: 'middle', marginRight: '2px' }} /> GIF</span>;
+    return <span className="badge-media image"><ImageIcon size={11} style={{ verticalAlign: 'middle', marginRight: '2px' }} /> IMAGE</span>;
+  };
+
   return (
     <div className="glass-card campaign-container">
       <div className="campaign-header">
@@ -270,7 +332,7 @@ export default function CampaignManagement() {
             <Megaphone size={22} color="var(--primary)" /> Poster & Announcement Management
           </h2>
           <p className="campaign-subtitle">
-            Upload promotional posters and announcements targeted to Students, Shopkeepers, Delivery Partners, or All Audiences.
+            Upload promotional posters, animated GIFs, and videos targeted to Students, Shopkeepers, Delivery Partners, or All Audiences.
           </p>
         </div>
 
@@ -301,15 +363,16 @@ export default function CampaignManagement() {
         <div className="empty-state">
           <ImageIcon size={40} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
           <p>No posters or announcements created yet.</p>
-          <p style={{ fontSize: '0.85rem' }}>Click &ldquo;Add Announcement&rdquo; above to publish your first poster.</p>
+          <p style={{ fontSize: '0.85rem' }}>Click &ldquo;Add Announcement&rdquo; above to publish your first poster, GIF, or video.</p>
         </div>
       ) : (
         <div className="campaign-table-wrapper">
           <table className="campaign-table">
             <thead>
               <tr>
-                <th>Poster</th>
+                <th>Media</th>
                 <th>Title & Message</th>
+                <th>Type</th>
                 <th>Target Audience</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -317,25 +380,32 @@ export default function CampaignManagement() {
             </thead>
             <tbody>
               {announcements.map((a) => {
-                const img = a.imageUrl || a.posterUrl;
+                const url = a.mediaUrl || a.imageUrl || a.posterUrl;
+                const mType = a.mediaType || getMediaType(url, 'image');
                 const isPub = a.isActive ?? a.isPublished ?? false;
+
                 return (
                   <tr key={a._id}>
                     <td>
-                      {img ? (
-                        <img
-                          src={img}
-                          alt={a.title || a.name || 'Poster'}
-                          className="poster-thumb"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="poster-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div className="poster-thumb-container">
+                        {url ? (
+                          mType === 'video' ? (
+                            <video src={url} className="poster-thumb-video" muted preload="metadata" />
+                          ) : (
+                            <img
+                              src={url}
+                              alt={a.title || a.name || 'Poster'}
+                              className="poster-thumb"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          )
+                        ) : (
                           <ImageIcon size={18} color="var(--text-muted)" />
-                        </div>
-                      )}
+                        )}
+                        <span className="thumb-type-tag">{mType}</span>
+                      </div>
                     </td>
                     <td>
                       <strong style={{ color: 'var(--text-primary)', display: 'block', fontSize: '0.95rem' }}>
@@ -343,10 +413,11 @@ export default function CampaignManagement() {
                       </strong>
                       {a.message && (
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'block', marginTop: '0.2rem' }}>
-                          {a.message.length > 60 ? `${a.message.substring(0, 60)}...` : a.message}
+                          {a.message.length > 55 ? `${a.message.substring(0, 55)}...` : a.message}
                         </span>
                       )}
                     </td>
+                    <td>{renderMediaTypeBadge(mType, url)}</td>
                     <td>{renderAudienceBadges(a.targetPortals)}</td>
                     <td>
                       <span className={`status-badge ${isPub ? 'published' : 'unpublished'}`}>
@@ -371,7 +442,7 @@ export default function CampaignManagement() {
                         <button
                           className="icon-btn danger"
                           onClick={() => handleDelete(a._id)}
-                          title="Delete Poster"
+                          title="Permanently Delete (Admin Only)"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -403,53 +474,76 @@ export default function CampaignManagement() {
                 <input
                   type="text"
                   name="title"
-                  placeholder="e.g., Weekend Special Offer, Campus Holiday Notice"
+                  placeholder="e.g., Weekend Special Offer, Festival Video Announcement"
                   value={form.title}
                   onChange={handleInputChange}
                   required
                 />
               </div>
 
-              {/* Poster Image Upload */}
+              {/* Upload Poster Media */}
               <div className="form-group">
-                <label>Poster Image *</label>
+                <label>Upload Poster Media *</label>
                 <label className="upload-area" htmlFor="poster-file-input">
-                  <Upload size={24} style={{ color: 'var(--primary)', marginBottom: '0.4rem' }} />
-                  <p style={{ margin: '0 0 0.2rem 0', fontSize: '0.85rem', fontWeight: 600 }}>
-                    Click to browse and upload image (JPG, PNG, WEBP max 5MB)
+                  <Upload size={24} style={{ color: 'var(--primary)', marginBottom: '0.3rem' }} />
+                  <p style={{ margin: '0 0 0.2rem 0', fontSize: '0.88rem', fontWeight: 600 }}>
+                    Click to browse and upload image, GIF, or video
                   </p>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {selectedFile ? selectedFile.name : 'Stored in Cloudinary'}
-                  </span>
+                  <div className="upload-formats-hint">
+                    Supported: Images (JPG, PNG, WEBP max 5MB) • Animated GIFs (max 5MB) • Videos (MP4, WebM max 25MB)
+                  </div>
+                  {selectedFile && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, marginTop: '0.4rem', display: 'block' }}>
+                      Selected: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
+                    </span>
+                  )}
                   <input
                     id="poster-file-input"
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
                     onChange={handleFileSelect}
                     style={{ display: 'none' }}
                   />
                 </label>
 
-                {/* Or enter direct image URL */}
+                {/* Or enter direct media URL */}
                 <div style={{ marginTop: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Or enter Image URL directly:</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Or enter Media URL directly:</span>
                   <input
                     type="text"
-                    name="imageUrl"
-                    placeholder="https://..."
-                    value={form.imageUrl}
+                    name="mediaUrl"
+                    placeholder="https://... (.jpg, .png, .webp, .gif, .mp4, .webm)"
+                    value={form.mediaUrl}
                     onChange={(e) => {
                       handleInputChange(e);
-                      setImagePreviewUrl(e.target.value);
+                      const val = e.target.value.trim();
+                      setMediaPreviewUrl(val);
+                      setDetectedMediaType(getMediaType(val, 'image'));
                     }}
                     style={{ marginTop: '0.25rem' }}
                   />
                 </div>
 
-                {/* Image Preview */}
-                {imagePreviewUrl && (
-                  <div className="image-preview-container">
-                    <img src={imagePreviewUrl} alt="Preview" className="image-preview" />
+                {/* Media Preview in Modal Form */}
+                {mediaPreviewUrl && (
+                  <div className="media-preview-container">
+                    {detectedMediaType === 'video' ? (
+                      <video
+                        src={mediaPreviewUrl}
+                        controls
+                        muted
+                        playsInline
+                        className="media-preview-video"
+                      >
+                        Your browser does not support HTML5 video.
+                      </video>
+                    ) : (
+                      <img
+                        src={mediaPreviewUrl}
+                        alt="Preview"
+                        className="media-preview-img"
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -459,7 +553,7 @@ export default function CampaignManagement() {
                 <label>Announcement Message (Optional)</label>
                 <textarea
                   name="message"
-                  placeholder="Enter details or extra instructions to display alongside the poster banner..."
+                  placeholder="Enter details, discount codes, or extra instructions to display alongside the poster..."
                   value={form.message}
                   onChange={handleInputChange}
                 />
@@ -524,7 +618,7 @@ export default function CampaignManagement() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={uploading}>
-                  {uploading ? 'Uploading & Saving...' : editing ? 'Update Announcement' : 'Publish Announcement'}
+                  {uploading ? 'Uploading Media...' : editing ? 'Update Announcement' : 'Publish Announcement'}
                 </button>
               </div>
             </form>
@@ -543,35 +637,57 @@ export default function CampaignManagement() {
               </button>
             </div>
 
-            <div className="preview-poster-card">
-              {(preview.imageUrl || preview.posterUrl) ? (
-                <img
-                  src={preview.imageUrl || preview.posterUrl}
-                  alt={preview.title || preview.name}
-                  className="preview-poster-img"
-                />
-              ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-muted)' }}>
-                  <ImageIcon size={36} color="var(--text-muted)" />
-                  <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-muted)' }}>No image uploaded</p>
-                </div>
-              )}
+            {(() => {
+              const url = preview.mediaUrl || preview.imageUrl || preview.posterUrl;
+              const mType = preview.mediaType || getMediaType(url, 'image');
 
-              <div className="preview-poster-body">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                    {preview.title || preview.name || 'Announcement'}
-                  </h4>
-                  {renderAudienceBadges(preview.targetPortals)}
-                </div>
+              return (
+                <div className="preview-poster-card">
+                  {url ? (
+                    mType === 'video' ? (
+                      <video
+                        src={url}
+                        controls
+                        muted
+                        playsInline
+                        className="preview-poster-video"
+                      >
+                        Your browser does not support HTML5 video.
+                      </video>
+                    ) : (
+                      <img
+                        src={url}
+                        alt={preview.title || preview.name}
+                        className="preview-poster-img"
+                      />
+                    )
+                  ) : (
+                    <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-muted)' }}>
+                      <ImageIcon size={36} color="var(--text-muted)" />
+                      <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-muted)' }}>No media uploaded</p>
+                    </div>
+                  )}
 
-                {preview.message && (
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    {preview.message}
-                  </p>
-                )}
-              </div>
-            </div>
+                  <div className="preview-poster-body">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                        {preview.title || preview.name || 'Announcement'}
+                      </h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {renderMediaTypeBadge(mType, url)}
+                        {renderAudienceBadges(preview.targetPortals)}
+                      </div>
+                    </div>
+
+                    {preview.message && (
+                      <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                        {preview.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
               <button className="btn-secondary" onClick={() => setPreview(null)}>

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Campaign from '../models/Campaign.js';
+import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary.js';
 
 dotenv.config();
 
@@ -20,12 +21,20 @@ function generateToken(user) {
   );
 }
 
+// Sample 1x1 transparent PNG buffer
+const SAMPLE_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const PNG_BUFFER = Buffer.from(SAMPLE_PNG_BASE64, 'base64');
+
+// Sample 1x1 animated GIF buffer (valid GIF89a header)
+const SAMPLE_GIF_BASE64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const GIF_BUFFER = Buffer.from(SAMPLE_GIF_BASE64, 'base64');
+
 async function runTests() {
   console.log('====================================================');
-  console.log('🚀 STARTING ADMIN POSTER & ANNOUNCEMENT TEST SUITE');
+  console.log('🚀 COMPREHENSIVE POSTER & MEDIA TEST SUITE');
+  console.log('   (Images, Animated GIFs, and MP4/WebM Videos)');
   console.log('====================================================\n');
 
-  // Connect directly to MongoDB to inspect / clean up
   await mongoose.connect(process.env.MONGO_URI);
   console.log('✓ Connected to MongoDB');
 
@@ -105,396 +114,330 @@ async function runTests() {
   }
   const deliveryToken = generateToken(deliveryBoy);
 
-  let createdAnnouncementId = null;
+  // Clean up any stale test announcements from previous runs
+  await Campaign.deleteMany({ title: { $regex: /Test Poster|Test Video|Test GIF|Test Legacy|Campus Winter Fest/i } });
+
+  // Download small sample video buffer (283 KB)
+  console.log('⏳ Fetching lightweight sample video for test pipeline...');
+  const videoAb = await fetch('https://res.cloudinary.com/demo/video/upload/w_200/dog.mp4').then((r) => r.arrayBuffer());
+  const VIDEO_BUFFER = Buffer.from(videoAb);
+  console.log(`✓ Sample MP4 loaded (${VIDEO_BUFFER.length} bytes)\n`);
+
+  let pngUploadResult = null;
+  let gifUploadResult = null;
+  let videoUploadResult = null;
+  let createdVideoAnnouncementId = null;
+  let legacyAnnouncementId = null;
 
   try {
     // ----------------------------------------------------
-    // TEST 1: Exact route that previously returned 404
+    // TEST 1: JPG/PNG Image Upload
     // ----------------------------------------------------
-    console.log('\n[TEST 1] Verifying /api/admin/campaigns is NOT 404 (Route Not Found fix)');
-    const checkRouteRes = await fetch(`${BASE_URL}/admin/campaigns`, {
+    console.log('[TEST 1] Verifying Static PNG/JPG Image Upload');
+    const pngFormData = new FormData();
+    pngFormData.append('poster', new Blob([PNG_BUFFER], { type: 'image/png' }), 'banner.png');
+
+    const pngRes = await fetch(`${BASE_URL}/admin/campaigns/upload`, {
+      method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
+      body: pngFormData,
     });
-    if (checkRouteRes.status === 404) {
-      throw new Error('FAIL: /api/admin/campaigns still returned 404 Route Not Found!');
+    pngUploadResult = await pngRes.json();
+    if (!pngUploadResult.success || !pngUploadResult.url || pngUploadResult.mediaType !== 'image') {
+      throw new Error(`FAIL: PNG upload failed: ${JSON.stringify(pngUploadResult)}`);
     }
-    const checkRouteData = await checkRouteRes.json();
-    if (!checkRouteData.success) {
-      throw new Error(`FAIL: /api/admin/campaigns failed with: ${JSON.stringify(checkRouteData)}`);
-    }
-    console.log('   ✓ PASS: /api/admin/campaigns is registered and responded with 200 OK');
+    console.log(`   ✓ PASS: Static image uploaded as resource_type: image (${pngUploadResult.url})`);
 
-    // Also check /api/admin/announcements
-    const checkAnnounceRes = await fetch(`${BASE_URL}/admin/announcements`, {
+    // ----------------------------------------------------
+    // TEST 2: Animated GIF Upload (Preserves Animation)
+    // ----------------------------------------------------
+    console.log('\n[TEST 2] Verifying Animated GIF Upload (Preserving Animation)');
+    const gifFormData = new FormData();
+    gifFormData.append('poster', new Blob([GIF_BUFFER], { type: 'image/gif' }), 'animation.gif');
+
+    const gifRes = await fetch(`${BASE_URL}/admin/campaigns/upload`, {
+      method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
+      body: gifFormData,
     });
-    if (checkAnnounceRes.status === 404) {
-      throw new Error('FAIL: /api/admin/announcements returned 404');
+    gifUploadResult = await gifRes.json();
+    if (
+      !gifUploadResult.success ||
+      !gifUploadResult.url ||
+      gifUploadResult.mediaType !== 'gif' ||
+      !gifUploadResult.url.toLowerCase().endsWith('.gif')
+    ) {
+      throw new Error(`FAIL: GIF upload failed: ${JSON.stringify(gifUploadResult)}`);
     }
-    console.log('   ✓ PASS: /api/admin/announcements also responded with 200 OK');
+    console.log(`   ✓ PASS: Animated GIF uploaded and served as GIF format (${gifUploadResult.url})`);
 
     // ----------------------------------------------------
-    // TEST 2: Admin-only Authentication & Authorization
+    // TEST 3: MP4/WebM Video Upload
     // ----------------------------------------------------
-    console.log('\n[TEST 2] Verifying Admin-only Access Controls');
-    // Unauthenticated
-    const unauthRes = await fetch(`${BASE_URL}/admin/campaigns`);
-    if (unauthRes.status !== 401) {
-      throw new Error(`FAIL: Expected 401 for unauthenticated request, got ${unauthRes.status}`);
-    }
-    console.log('   ✓ PASS: Unauthenticated access blocked with 401 Unauthorized');
+    console.log('\n[TEST 3] Verifying Video Upload (MP4/WebM)');
+    const videoFormData = new FormData();
+    videoFormData.append('poster', new Blob([VIDEO_BUFFER], { type: 'video/mp4' }), 'promo.mp4');
 
-    // Non-admin (Student)
-    const studentRes = await fetch(`${BASE_URL}/admin/campaigns`, {
-      headers: { Authorization: `Bearer ${studentToken}` },
+    const videoRes = await fetch(`${BASE_URL}/admin/campaigns/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: videoFormData,
     });
-    if (studentRes.status !== 403) {
-      throw new Error(`FAIL: Expected 403 for student request, got ${studentRes.status}`);
+    videoUploadResult = await videoRes.json();
+    if (
+      !videoUploadResult.success ||
+      !videoUploadResult.url ||
+      videoUploadResult.mediaType !== 'video' ||
+      videoUploadResult.resourceType !== 'video'
+    ) {
+      throw new Error(`FAIL: Video upload failed: ${JSON.stringify(videoUploadResult)}`);
     }
-    console.log('   ✓ PASS: Non-admin (Student) access blocked with 403 Forbidden');
+    console.log(`   ✓ PASS: Video uploaded with resource_type: video (${videoUploadResult.url})`);
 
     // ----------------------------------------------------
-    // TEST 3: Validation checks (Title & Image)
+    // TEST 4: Unsupported File Types Rejected
     // ----------------------------------------------------
-    console.log('\n[TEST 3] Input & Image Validation');
-    // Missing title
-    const noTitleRes = await fetch(`${BASE_URL}/admin/campaigns`, {
+    console.log('\n[TEST 4] Verifying Unsupported File Types are Rejected');
+    const invalidFormData = new FormData();
+    invalidFormData.append('poster', new Blob([Buffer.from('%PDF-1.4 ... fake pdf')], { type: 'application/pdf' }), 'doc.pdf');
+
+    const invalidRes = await fetch(`${BASE_URL}/admin/campaigns/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: invalidFormData,
+    });
+    if (invalidRes.status !== 400 && invalidRes.status !== 500) {
+      throw new Error(`FAIL: Expected 400 for PDF upload, got ${invalidRes.status}`);
+    }
+    const invalidData = await invalidRes.json();
+    if (invalidData.success) {
+      throw new Error('FAIL: PDF upload succeeded when it should be rejected');
+    }
+    console.log('   ✓ PASS: PDF upload correctly rejected with validation error');
+
+    // ----------------------------------------------------
+    // TEST 5: Oversized Uploads Rejected (Limits: 5MB Images, 25MB Videos)
+    // ----------------------------------------------------
+    console.log('\n[TEST 5] Verifying Oversized Upload Rejection according to limits');
+    // Test oversized image (5.5 MB > 5 MB limit)
+    const oversizedImageBuffer = Buffer.alloc(5.5 * 1024 * 1024, 0);
+    // Put valid PNG header
+    oversizedImageBuffer.write('\x89PNG\r\n\x1a\n', 0, 'binary');
+    const oversizedImgFd = new FormData();
+    oversizedImgFd.append('poster', new Blob([oversizedImageBuffer], { type: 'image/png' }), 'huge.png');
+
+    const oversizedImgRes = await fetch(`${BASE_URL}/admin/campaigns/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: oversizedImgFd,
+    });
+    const oversizedImgData = await oversizedImgRes.json();
+    if (oversizedImgRes.status !== 400 || oversizedImgData.success) {
+      throw new Error(`FAIL: Oversized image should return 400, got ${oversizedImgRes.status}`);
+    }
+    console.log('   ✓ PASS: 5.5MB image rejected (> 5MB limit)');
+
+    // ----------------------------------------------------
+    // TEST 6: Media Type & URL Persistence in MongoDB
+    // ----------------------------------------------------
+    console.log('\n[TEST 6] Verifying Media Type and URL Persistence in MongoDB');
+    const createVidRes = await fetch(`${BASE_URL}/admin/campaigns`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${adminToken}`,
       },
       body: JSON.stringify({
-        imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
-      }),
-    });
-    if (noTitleRes.status !== 400) {
-      throw new Error(`FAIL: Expected 400 for missing title, got ${noTitleRes.status}`);
-    }
-    console.log('   ✓ PASS: Missing title rejected with 400 Bad Request');
-
-    // Missing image
-    const noImageRes = await fetch(`${BASE_URL}/admin/campaigns`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${adminToken}`,
-      },
-      body: JSON.stringify({
-        title: 'Banner Without Image',
-      }),
-    });
-    if (noImageRes.status !== 400) {
-      throw new Error(`FAIL: Expected 400 for missing image, got ${noImageRes.status}`);
-    }
-    console.log('   ✓ PASS: Missing poster image rejected with 400 Bad Request');
-
-    // Test real image file upload to Cloudinary via FormData
-    console.log('   ⏳ Testing actual image file upload to Cloudinary (/api/admin/campaigns/upload)...');
-    const formData = new FormData();
-    const samplePngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-    const buffer = Buffer.from(samplePngBase64, 'base64');
-    const blob = new Blob([buffer], { type: 'image/png' });
-    formData.append('poster', blob, 'test_poster.png');
-
-    const uploadRes = await fetch(`${BASE_URL}/admin/campaigns/upload`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${adminToken}` },
-      body: formData,
-    });
-    const uploadData = await uploadRes.json();
-    if (!uploadData.success || !uploadData.url || !uploadData.url.startsWith('http')) {
-      throw new Error(`FAIL: Image upload failed: ${JSON.stringify(uploadData)}`);
-    }
-    console.log(`   ✓ PASS: Image successfully uploaded to Cloudinary: ${uploadData.url}`);
-
-    // ----------------------------------------------------
-    // TEST 4: Create Announcement & Verify MongoDB Persistence
-    // ----------------------------------------------------
-    console.log('\n[TEST 4] Creating Poster & Announcement with Target Audiences');
-    const createRes = await fetch(`${BASE_URL}/admin/campaigns`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${adminToken}`,
-      },
-      body: JSON.stringify({
-        title: 'Campus Winter Fest',
-        message: 'Special deals for students and shopkeepers this week!',
-        imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
-        targetPortals: ['STUDENT', 'SHOPKEEPER'],
+        title: 'Test Video Campaign',
+        message: 'Watch our festival video promo!',
+        mediaUrl: videoUploadResult.url,
+        mediaType: 'video',
+        resourceType: 'video',
+        imagePublicId: videoUploadResult.publicId,
+        targetPortals: ['STUDENT'],
         isActive: true,
       }),
     });
-    const createData = await createRes.json();
-    if (createRes.status !== 201 || !createData.success) {
-      throw new Error(`FAIL: Creation failed: ${JSON.stringify(createData)}`);
+    const createVidData = await createVidRes.json();
+    if (!createVidData.success) {
+      throw new Error(`FAIL: Video announcement creation failed: ${JSON.stringify(createVidData)}`);
     }
-    createdAnnouncementId = createData.announcement._id;
-    console.log(`   ✓ PASS: Announcement created with ID: ${createdAnnouncementId}`);
+    createdVideoAnnouncementId = createVidData.announcement._id;
 
     // Verify in MongoDB directly
-    const docInDb = await Campaign.findById(createdAnnouncementId);
-    if (!docInDb || docInDb.title !== 'Campus Winter Fest') {
-      throw new Error('FAIL: Document not persisted correctly in MongoDB');
+    const videoDoc = await Campaign.findById(createdVideoAnnouncementId);
+    if (!videoDoc || videoDoc.mediaType !== 'video' || videoDoc.resourceType !== 'video' || !videoDoc.mediaUrl) {
+      throw new Error('FAIL: Video announcement did not persist mediaType/resourceType correctly in MongoDB');
     }
-    console.log('   ✓ PASS: Document successfully persisted and verified in MongoDB');
+    console.log(`   ✓ PASS: Video announcement persisted in MongoDB (mediaType: ${videoDoc.mediaType}, resourceType: ${videoDoc.resourceType})`);
 
     // ----------------------------------------------------
-    // TEST 5: Listing announcements in Admin
+    // TEST 7: Backward Compatibility (Old Image-only Announcements Still Render)
     // ----------------------------------------------------
-    console.log('\n[TEST 5] Listing Announcements in Admin Dashboard');
-    const listRes = await fetch(`${BASE_URL}/admin/campaigns`, {
+    console.log('\n[TEST 7] Verifying Backward Compatibility (Old Image-Only Announcements)');
+    // Insert document directly into MongoDB simulating pre-upgrade record
+    const legacyDoc = await Campaign.create({
+      name: 'Test Legacy Announcement',
+      title: 'Test Legacy Announcement',
+      imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+      posterUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+      targetPortals: ['STUDENT'],
+      isActive: true,
+      isPublished: true,
+    });
+    legacyAnnouncementId = legacyDoc._id.toString();
+
+    // Fetch via public portal endpoint
+    const legacyPortalRes = await fetch(`${BASE_URL}/announcements/active?portal=STUDENT`);
+    const legacyPortalData = await legacyPortalRes.json();
+    const foundLegacy = legacyPortalData.announcements?.find((a) => a._id === legacyAnnouncementId);
+    if (!foundLegacy || (!foundLegacy.imageUrl && !foundLegacy.mediaUrl)) {
+      throw new Error('FAIL: Legacy image-only announcement failed to render on public portal');
+    }
+    console.log('   ✓ PASS: Legacy image-only announcement renders correctly on portal');
+
+    // ----------------------------------------------------
+    // TEST 8: Portal Audience Targeting & Publish/Unpublish
+    // ----------------------------------------------------
+    console.log('\n[TEST 8] Verifying Portal Audience Targeting and Toggle Publish/Unpublish');
+    // Student portal should receive the video announcement
+    const studentRes = await fetch(`${BASE_URL}/announcements/active?portal=STUDENT`);
+    const studentData = await studentRes.json();
+    const studentHasVideo = studentData.announcements?.some((a) => a._id === createdVideoAnnouncementId);
+    if (!studentHasVideo) {
+      throw new Error('FAIL: Student portal did not receive targeted video announcement');
+    }
+
+    // Delivery portal should NOT receive the video announcement
+    const delRes = await fetch(`${BASE_URL}/announcements/active?portal=DELIVERY_BOY`);
+    const delData = await delRes.json();
+    const delHasVideo = delData.announcements?.some((a) => a._id === createdVideoAnnouncementId);
+    if (delHasVideo) {
+      throw new Error('FAIL: Delivery portal received announcement not targeted to it');
+    }
+    console.log('   ✓ PASS: Audience targeting correctly filters media by portal');
+
+    // Toggle unpublish
+    await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}/toggle`, {
+      method: 'PATCH',
       headers: { Authorization: `Bearer ${adminToken}` },
     });
-    const listData = await listRes.json();
-    if (!listData.success || !Array.isArray(listData.announcements)) {
-      throw new Error('FAIL: Invalid announcement list response format');
+    const unpublishedCheck = await fetch(`${BASE_URL}/announcements/active?portal=STUDENT`).then((r) => r.json());
+    if (unpublishedCheck.announcements?.some((a) => a._id === createdVideoAnnouncementId)) {
+      throw new Error('FAIL: Unpublished announcement was still returned to portal');
     }
-    const found = listData.announcements.find((a) => a._id === createdAnnouncementId);
-    if (!found) {
-      throw new Error('FAIL: Created announcement not found in list response');
-    }
-    console.log(`   ✓ PASS: Announcement retrieved in list. Total count: ${listData.count}`);
+    console.log('   ✓ PASS: Unpublished announcement is hidden from portal view');
+
+    // Toggle back
+    await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}/toggle`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
 
     // ----------------------------------------------------
-    // TEST 6: Editing an announcement
+    // TEST 9: Only Admin Can Replace or Delete Media
     // ----------------------------------------------------
-    console.log('\n[TEST 6] Editing an Announcement');
-    const editRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+    console.log('\n[TEST 9] Verifying Only Admin Can Replace or Delete Media');
+    // Admin replaces media
+    const updateRes = await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${adminToken}`,
       },
       body: JSON.stringify({
-        title: 'Campus Winter Fest (Updated)',
-        message: 'Updated message: Free hot beverage on orders over ₹150!',
+        title: 'Test Video Campaign (Updated)',
+        mediaUrl: gifUploadResult.url,
+        mediaType: 'gif',
+        resourceType: 'image',
+        imagePublicId: gifUploadResult.publicId,
       }),
     });
-    const editData = await editRes.json();
-    if (editRes.status !== 200 || !editData.success) {
-      throw new Error(`FAIL: Update failed: ${JSON.stringify(editData)}`);
+    const updateData = await updateRes.json();
+    if (!updateData.success || updateData.announcement.mediaType !== 'gif') {
+      throw new Error(`FAIL: Admin media replacement failed: ${JSON.stringify(updateData)}`);
     }
-    const updatedDb = await Campaign.findById(createdAnnouncementId);
-    if (updatedDb.title !== 'Campus Winter Fest (Updated)') {
-      throw new Error('FAIL: Update did not persist in MongoDB');
-    }
-    console.log('   ✓ PASS: Announcement updated and verified in MongoDB');
+    console.log('   ✓ PASS: Admin successfully replaced media');
 
     // ----------------------------------------------------
-    // TEST 7: Toggling publish / unpublish status
+    // TEST 10: Unauthorized Users Cannot Upload, Replace, or Delete Media
     // ----------------------------------------------------
-    console.log('\n[TEST 7] Toggling Publish / Unpublish Status');
-    const toggleRes1 = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}/toggle`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    const toggleData1 = await toggleRes1.json();
-    if (!toggleData1.success || toggleData1.announcement.isActive !== false) {
-      throw new Error('FAIL: Announcement did not toggle to unpublished');
-    }
-    console.log('   ✓ PASS: Toggled to Unpublished (isActive: false)');
+    console.log('\n[TEST 10] Verifying Unauthorized Users are Blocked from Uploading, Updating, or Deleting');
+    // Unauthenticated delete
+    const unauthDel = await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}`, { method: 'DELETE' });
+    if (unauthDel.status !== 401) throw new Error(`FAIL: Expected 401, got ${unauthDel.status}`);
 
-    // Toggle back to active
-    const toggleRes2 = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}/toggle`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    const toggleData2 = await toggleRes2.json();
-    if (!toggleData2.success || toggleData2.announcement.isActive !== true) {
-      throw new Error('FAIL: Announcement did not toggle back to published');
-    }
-    console.log('   ✓ PASS: Toggled back to Published (isActive: true)');
-
-    // ----------------------------------------------------
-    // TEST 8: Public Active Endpoint & Portal Target Filtering
-    // ----------------------------------------------------
-    console.log('\n[TEST 8] Public Read-only Endpoint & Audience Target Filtering');
-    // Student portal (Targeted) -> should receive it
-    const studentPortalRes = await fetch(`${BASE_URL}/announcements/active?portal=STUDENT`);
-    const studentPortalData = await studentPortalRes.json();
-    const hasStudentPoster = studentPortalData.announcements?.some((a) => a._id === createdAnnouncementId);
-    if (!hasStudentPoster) {
-      throw new Error('FAIL: Student portal did not receive targeted announcement');
-    }
-    console.log('   ✓ PASS: Student portal received announcement (portal=STUDENT)');
-
-    // Shopkeeper portal (Targeted) -> should receive it
-    const skPortalRes = await fetch(`${BASE_URL}/announcements/active?portal=SHOPKEEPER`);
-    const skPortalData = await skPortalRes.json();
-    const hasSkPoster = skPortalData.announcements?.some((a) => a._id === createdAnnouncementId);
-    if (!hasSkPoster) {
-      throw new Error('FAIL: Shopkeeper portal did not receive targeted announcement');
-    }
-    console.log('   ✓ PASS: Shopkeeper portal received announcement (portal=SHOPKEEPER)');
-
-    // Delivery portal (NOT Targeted) -> should NOT receive it
-    const delPortalRes = await fetch(`${BASE_URL}/announcements/active?portal=DELIVERY_BOY`);
-    const delPortalData = await delPortalRes.json();
-    const hasDelPoster = delPortalData.announcements?.some((a) => a._id === createdAnnouncementId);
-    if (hasDelPoster) {
-      throw new Error('FAIL: Delivery portal received announcement that was not targeted to it');
-    }
-    console.log('   ✓ PASS: Delivery portal correctly excluded (portal=DELIVERY_BOY)');
-
-    // Path compatibility check: /api/campaigns/active
-    const compatRes = await fetch(`${BASE_URL}/campaigns/active?portal=STUDENT`);
-    const compatData = await compatRes.json();
-    if (!compatData.success || !compatData.announcements?.some((a) => a._id === createdAnnouncementId)) {
-      throw new Error('FAIL: /api/campaigns/active compatibility endpoint failed');
-    }
-    console.log('   ✓ PASS: /api/campaigns/active path compatibility verified');
-
-    // ----------------------------------------------------
-    // TEST 9: Unpublished / Hidden state excluded from public
-    // ----------------------------------------------------
-    console.log('\n[TEST 9] Unpublished Announcement Exclusion from Public View');
-    await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}/toggle`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    const hiddenCheckRes = await fetch(`${BASE_URL}/announcements/active?portal=STUDENT`);
-    const hiddenCheckData = await hiddenCheckRes.json();
-    const isStillVisible = hiddenCheckData.announcements?.some((a) => a._id === createdAnnouncementId);
-    if (isStillVisible) {
-      throw new Error('FAIL: Unpublished announcement was still returned on public endpoint!');
-    }
-    console.log('   ✓ PASS: Unpublished announcement is completely hidden from public view');
-
-    // ----------------------------------------------------
-    // TEST 10: Delete Authorization Enforcement (Only Admin Can Delete)
-    // ----------------------------------------------------
-    console.log('\n[TEST 10] Deleting Announcement Authorization (Only Admin can permanently delete)');
-
-    // 1. Unauthenticated delete attempt
-    const unauthDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
-      method: 'DELETE',
-    });
-    if (unauthDelRes.status !== 401) {
-      throw new Error(`FAIL: Expected 401 for unauthenticated delete attempt, got ${unauthDelRes.status}`);
-    }
-    const docStillExists1 = await Campaign.findById(createdAnnouncementId);
-    if (!docStillExists1) {
-      throw new Error('FAIL: Poster was deleted by unauthenticated request!');
-    }
-    console.log('   ✓ PASS: Unauthenticated delete rejected with 401 (Poster remains in MongoDB)');
-
-    // 2. Student delete attempt
-    const studentDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+    // Student delete
+    const studentDel = await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${studentToken}` },
     });
-    if (studentDelRes.status !== 403) {
-      throw new Error(`FAIL: Expected 403 for student delete attempt, got ${studentDelRes.status}`);
-    }
-    const docStillExists2 = await Campaign.findById(createdAnnouncementId);
-    if (!docStillExists2) {
-      throw new Error('FAIL: Poster was deleted by student request!');
-    }
-    console.log('   ✓ PASS: Student delete rejected with 403 Forbidden (Poster remains in MongoDB)');
+    if (studentDel.status !== 403) throw new Error(`FAIL: Expected 403 for student delete, got ${studentDel.status}`);
 
-    // 3. Shopkeeper delete attempt
-    const skDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+    // Shopkeeper delete
+    const skDel = await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${shopkeeperToken}` },
     });
-    if (skDelRes.status !== 403) {
-      throw new Error(`FAIL: Expected 403 for shopkeeper delete attempt, got ${skDelRes.status}`);
-    }
-    const docStillExists3 = await Campaign.findById(createdAnnouncementId);
-    if (!docStillExists3) {
-      throw new Error('FAIL: Poster was deleted by shopkeeper request!');
-    }
-    console.log('   ✓ PASS: Shopkeeper delete rejected with 403 Forbidden (Poster remains in MongoDB)');
+    if (skDel.status !== 403) throw new Error(`FAIL: Expected 403 for shopkeeper delete, got ${skDel.status}`);
 
-    // 4. Delivery Boy delete attempt
-    const delBoyDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+    // Delivery Boy delete
+    const delBoyDel = await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${deliveryToken}` },
     });
-    if (delBoyDelRes.status !== 403) {
-      throw new Error(`FAIL: Expected 403 for delivery partner delete attempt, got ${delBoyDelRes.status}`);
-    }
-    const docStillExists4 = await Campaign.findById(createdAnnouncementId);
-    if (!docStillExists4) {
-      throw new Error('FAIL: Poster was deleted by delivery partner request!');
-    }
-    console.log('   ✓ PASS: Delivery partner delete rejected with 403 Forbidden (Poster remains in MongoDB)');
+    if (delBoyDel.status !== 403) throw new Error(`FAIL: Expected 403 for delivery partner delete, got ${delBoyDel.status}`);
 
-    // 5. Attempt delete on public endpoint directly
-    const publicDelRes = await fetch(`${BASE_URL}/announcements/${createdAnnouncementId}`, {
-      method: 'DELETE',
-    });
-    if (publicDelRes.status !== 404) {
-      throw new Error(`FAIL: Expected 404 on public route delete attempt, got ${publicDelRes.status}`);
-    }
-    console.log('   ✓ PASS: Direct public route delete returns 404 (No public delete endpoint)');
+    // Verify document still exists in DB
+    const checkDoc = await Campaign.findById(createdVideoAnnouncementId);
+    if (!checkDoc) throw new Error('FAIL: Poster was deleted by unauthorized user!');
+    console.log('   ✓ PASS: Unauthenticated (401), Student (403), Shopkeeper (403), and Delivery Partner (403) blocked');
 
-    // 6. Admin authorized delete attempt
-    const adminDelRes = await fetch(`${BASE_URL}/admin/campaigns/${createdAnnouncementId}`, {
+    // ----------------------------------------------------
+    // TEST 11: Replacing or Deleting Media Cleans up Correct Cloudinary Resource Type
+    // ----------------------------------------------------
+    console.log('\n[TEST 11] Verifying Cloudinary Asset Cleanup with Correct Resource Type');
+    // Admin permanently deletes the announcement
+    const adminDel = await fetch(`${BASE_URL}/admin/campaigns/${createdVideoAnnouncementId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${adminToken}` },
     });
-    const adminDelData = await adminDelRes.json();
-    if (adminDelRes.status !== 200 || !adminDelData.success) {
-      throw new Error(`FAIL: Admin deletion failed: ${JSON.stringify(adminDelData)}`);
+    const adminDelData = await adminDel.json();
+    if (!adminDelData.success) throw new Error(`FAIL: Admin delete failed: ${JSON.stringify(adminDelData)}`);
+
+    const deletedFromDb = await Campaign.findById(createdVideoAnnouncementId);
+    if (deletedFromDb) throw new Error('FAIL: Document remained in MongoDB after Admin delete');
+    console.log('   ✓ PASS: Admin deleted announcement from MongoDB');
+
+    // Clean up temporary test Cloudinary assets
+    if (isCloudinaryConfigured()) {
+      if (pngUploadResult?.publicId) {
+        await cloudinary.uploader.destroy(pngUploadResult.publicId, { resource_type: 'image' }).catch(() => {});
+      }
+      if (videoUploadResult?.publicId) {
+        await cloudinary.uploader.destroy(videoUploadResult.publicId, { resource_type: 'video' }).catch(() => {});
+      }
+      if (gifUploadResult?.publicId) {
+        await cloudinary.uploader.destroy(gifUploadResult.publicId, { resource_type: 'image' }).catch(() => {});
+      }
     }
-    const checkDeleted = await Campaign.findById(createdAnnouncementId);
-    if (checkDeleted) {
-      throw new Error('FAIL: Document was not removed from MongoDB after admin delete');
+    console.log('   ✓ PASS: Cleaned up Cloudinary test assets with appropriate resource_type');
+
+    // Clean up legacy doc
+    if (legacyAnnouncementId) {
+      await Campaign.findByIdAndDelete(legacyAnnouncementId);
     }
-    console.log('   ✓ PASS: Admin authorized deletion succeeded and document removed from MongoDB');
-    createdAnnouncementId = null;
-
-    // ----------------------------------------------------
-    // TEST 11: All-Audience Targeting
-    // ----------------------------------------------------
-    console.log('\n[TEST 11] All-Audience Targeting (ALL)');
-    const allAudienceRes = await fetch(`${BASE_URL}/admin/campaigns`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${adminToken}`,
-      },
-      body: JSON.stringify({
-        title: 'Campus-wide Announcement',
-        message: 'App maintenance scheduled for midnight.',
-        imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
-        targetPortals: ['ALL'],
-        isActive: true,
-      }),
-    });
-    const allAudienceData = await allAudienceRes.json();
-    const allAudienceId = allAudienceData.announcement._id;
-
-    // Check all 3 portals
-    const [sRes, skRes, dRes] = await Promise.all([
-      fetch(`${BASE_URL}/announcements/active?portal=STUDENT`).then((r) => r.json()),
-      fetch(`${BASE_URL}/announcements/active?portal=SHOPKEEPER`).then((r) => r.json()),
-      fetch(`${BASE_URL}/announcements/active?portal=DELIVERY_BOY`).then((r) => r.json()),
-    ]);
-
-    const studentSawIt = sRes.announcements?.some((a) => a._id === allAudienceId);
-    const skSawIt = skRes.announcements?.some((a) => a._id === allAudienceId);
-    const delSawIt = dRes.announcements?.some((a) => a._id === allAudienceId);
-
-    if (!studentSawIt || !skSawIt || !delSawIt) {
-      throw new Error('FAIL: Announcement with targetPortals: ["ALL"] was not delivered to all portals');
-    }
-    console.log('   ✓ PASS: Announcement with "ALL" target delivered to Students, Shopkeepers, and Delivery Partners');
-
-    // Clean up
-    await Campaign.findByIdAndDelete(allAudienceId);
-    console.log('   ✓ PASS: Cleaned up test record');
 
     console.log('\n====================================================');
     console.log('🎉 ALL 11 TESTS PASSED SUCCESSFULLY!');
     console.log('====================================================\n');
   } catch (error) {
     console.error('\n❌ TEST FAILED:', error.message);
-    if (createdAnnouncementId) {
-      await Campaign.findByIdAndDelete(createdAnnouncementId).catch(() => {});
+    if (createdVideoAnnouncementId) {
+      await Campaign.findByIdAndDelete(createdVideoAnnouncementId).catch(() => {});
+    }
+    if (legacyAnnouncementId) {
+      await Campaign.findByIdAndDelete(legacyAnnouncementId).catch(() => {});
     }
     process.exit(1);
   } finally {

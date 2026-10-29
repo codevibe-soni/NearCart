@@ -22,7 +22,7 @@ import {
   uploadPosterImage,
 } from '../controllers/announcementController.js';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
-import upload from '../middleware/uploadMiddleware.js';
+import upload, { posterMediaUpload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -49,18 +49,18 @@ router.post('/clean-data', executeCleanData);
 
 // Admin Poster & Announcement Management routes (mapped to both /campaigns and /announcements for 100% path compatibility)
 router.get('/campaigns', getAnnouncements);
-router.post('/campaigns/upload', upload.single('poster'), uploadPosterImage);
-router.post('/campaigns', upload.single('poster'), createAnnouncement);
+router.post('/campaigns/upload', posterMediaUpload.single('poster'), uploadPosterImage);
+router.post('/campaigns', posterMediaUpload.single('poster'), createAnnouncement);
 router.get('/campaigns/:id', getAnnouncementById);
-router.put('/campaigns/:id', upload.single('poster'), updateAnnouncement);
+router.put('/campaigns/:id', posterMediaUpload.single('poster'), updateAnnouncement);
 router.patch('/campaigns/:id/toggle', togglePublishAnnouncement);
 router.delete('/campaigns/:id', deleteAnnouncement);
 
 router.get('/announcements', getAnnouncements);
-router.post('/announcements/upload', upload.single('poster'), uploadPosterImage);
-router.post('/announcements', upload.single('poster'), createAnnouncement);
+router.post('/announcements/upload', posterMediaUpload.single('poster'), uploadPosterImage);
+router.post('/announcements', posterMediaUpload.single('poster'), createAnnouncement);
 router.get('/announcements/:id', getAnnouncementById);
-router.put('/announcements/:id', upload.single('poster'), updateAnnouncement);
+router.put('/announcements/:id', posterMediaUpload.single('poster'), updateAnnouncement);
 router.patch('/announcements/:id/toggle', togglePublishAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
 

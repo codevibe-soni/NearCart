@@ -40,25 +40,53 @@ export default function AnnouncementPoster({ portal = 'STUDENT' }) {
     return null;
   }
 
+  // Helper to determine media type from URL
+  const resolveMediaType = (item, url) => {
+    if (item.mediaType) return item.mediaType;
+    if (!url) return 'image';
+    const lower = url.split('?')[0].toLowerCase();
+    if (lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.includes('/video/upload/')) {
+      return 'video';
+    }
+    if (lower.endsWith('.gif')) {
+      return 'gif';
+    }
+    return 'image';
+  };
+
   return (
     <div className="portal-announcement-container" role="region" aria-label="Portal Announcements">
       {announcements.map((item) => {
-        const img = item.imageUrl || item.posterUrl;
+        const mediaUrl = item.mediaUrl || item.imageUrl || item.posterUrl;
+        const mediaType = resolveMediaType(item, mediaUrl);
         const title = item.title || item.name || '';
         const message = item.message || '';
 
         return (
           <div key={item._id} className="portal-announcement-card">
-            {img && (
-              <div className="portal-announcement-img-wrap">
-                <img
-                  src={img}
-                  alt={title || 'Announcement Poster'}
-                  className="portal-announcement-img"
-                  onError={(e) => {
-                    e.target.parentElement.style.display = 'none';
-                  }}
-                />
+            {mediaUrl && (
+              <div className="portal-announcement-media-wrap">
+                {mediaType === 'video' ? (
+                  <video
+                    src={mediaUrl}
+                    controls
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="portal-announcement-video"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt={title || 'Announcement Poster'}
+                    className="portal-announcement-img"
+                    onError={(e) => {
+                      e.target.parentElement.style.display = 'none';
+                    }}
+                  />
+                )}
               </div>
             )}
 
