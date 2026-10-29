@@ -19,6 +19,7 @@ import {
   Eye,
   Smartphone,
   Store,
+  Megaphone,
 } from 'lucide-react';
 
 import CampaignManagement from '../components/CampaignManagement.jsx';
@@ -344,9 +345,12 @@ export default function Admin() {
         >
           🧹 Clean App Data
         </button>
-<button onClick={() => handleTabChange('CAMPAIGN_MANAGEMENT')} className={activeTab === 'CAMPAIGN_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}>
-  <TrendingUp size={18} /> Campaign Management
-</button>
+        <button
+          onClick={() => handleTabChange('CAMPAIGN_MANAGEMENT')}
+          className={activeTab === 'CAMPAIGN_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}
+        >
+          <Megaphone size={18} /> Posters & Announcements
+        </button>
       </div>
 
       {activeTab === 'SHOP_MANAGEMENT' && <AdminShopsTab />}

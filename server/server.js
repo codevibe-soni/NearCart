@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import announcementRoutes from './routes/announcementRoutes.js';
 
 import {
   errorHandler,
@@ -153,6 +154,10 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 
 app.use('/api/analytics', analyticsRoutes);
+
+app.use('/api/announcements', announcementRoutes);
+
+app.use('/api/campaigns', announcementRoutes);
 
 // ===============================
 // TEMPORARY CLOUDINARY TEST
