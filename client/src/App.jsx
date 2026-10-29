@@ -67,8 +67,8 @@ function App() {
   return (
     <>
       <SplashScreen />
+      <KarwaChauthPromo />
       <BrowserRouter>
-        <KarwaChauthPromo />
         <GlobalRouteLoader>
           <Suspense fallback={<PageFallback />}>
           <Routes>
