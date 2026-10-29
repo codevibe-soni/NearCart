@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import api from '../services/api';
 import { Truck, CheckCircle2, Clock, AlertCircle, MapPin, Package, RefreshCw, ArrowRight, DollarSign, Power, Navigation, Star, MessageSquare } from 'lucide-react';
-import AnnouncementPoster from '../components/AnnouncementPoster';
 
 export default function Delivery() {
   const { user, updateUser } = useAuth();
@@ -375,9 +374,6 @@ export default function Delivery() {
           <CheckCircle2 size={20} /> <span style={{ fontWeight: '500' }}>{success}</span>
         </div>
       )}
-
-      {/* Published Delivery Partner Announcements & Posters */}
-      <AnnouncementPoster portal="DELIVERY_BOY" />
 
       {/* Stats & Earnings Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>

@@ -34,7 +34,6 @@ import {
   Info,
 } from 'lucide-react';
 import CouponManagement from '../components/CouponManagement';
-import AnnouncementPoster from '../components/AnnouncementPoster';
 import {
   isShopOpen,
   getShopClosedReason,
@@ -911,9 +910,6 @@ export default function Shopkeeper() {
       ) : (
         /* Case 2: Full Business Portal with Sub-Navigation */
         <div>
-          {/* Published Shopkeeper Announcements & Posters */}
-          <AnnouncementPoster portal="SHOPKEEPER" />
-
           {/* Sub-Navigation Tabs */}
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
             {[

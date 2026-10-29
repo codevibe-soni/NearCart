@@ -12,7 +12,6 @@ import {
 } from '../components/StudentUIComponents';
 import { Store, Compass, ArrowRight } from 'lucide-react';
 import heroPoster from '../assets/hero-poster.jpg';
-import AnnouncementPoster from '../components/AnnouncementPoster';
 import './Student.css';
 
 export default function Student() {
@@ -190,9 +189,6 @@ export default function Student() {
           />
         </div>
       </div>
-
-      {/* Published Student Announcements & Posters */}
-      <AnnouncementPoster portal="STUDENT" />
 
       {/* Categories Horizontal Selector */}
       <div style={{ marginBottom: '2rem' }}>

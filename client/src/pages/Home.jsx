@@ -19,9 +19,8 @@ import {
   Code,
 } from 'lucide-react';
 import { getCategories } from '../services/studentService';
-import heroPoster from '../assets/hero-poster.jpg';
 import { CategoryCard } from '../components/StudentUIComponents';
-import ShoppingDemo from '../components/ShoppingDemo';
+import AnnouncementPoster from '../components/AnnouncementPoster';
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
@@ -167,9 +166,9 @@ export default function Home() {
         </Link>
       )}
     </div>
-    <div className="hero-poster-wrapper">
-      <img src={heroPoster} alt="NearCart hero" className="hero-poster-img" />
-      <ShoppingDemo />
+    {/* Admin-Managed Announcement Poster (Responsive horizontal banner) */}
+    <div style={{ width: '100%', maxWidth: '960px', margin: '2rem auto 0 auto' }}>
+      <AnnouncementPoster portal={user?.role || 'STUDENT'} />
     </div>
   </div>
 </section>
