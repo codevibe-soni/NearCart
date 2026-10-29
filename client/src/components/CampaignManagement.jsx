@@ -529,11 +529,24 @@ export default function CampaignManagement() {
                   <div className="media-preview-container">
                     {detectedMediaType === 'video' ? (
                       <video
+                        ref={(el) => {
+                          if (el) el.muted = true;
+                        }}
                         src={mediaPreviewUrl}
-                        controls
+                        autoPlay
                         muted
+                        loop
                         playsInline
+                        preload="auto"
+                        controls
                         className="media-preview-video"
+                        onLoadedMetadata={(e) => {
+                          try {
+                            e.currentTarget.muted = true;
+                            const p = e.currentTarget.play();
+                            if (p !== undefined) p.catch(() => {});
+                          } catch (_) {}
+                        }}
                       >
                         Your browser does not support HTML5 video.
                       </video>
@@ -645,15 +658,30 @@ export default function CampaignManagement() {
                 <div className="preview-poster-card">
                   {url ? (
                     mType === 'video' ? (
-                      <video
-                        src={url}
-                        controls
-                        muted
-                        playsInline
-                        className="preview-poster-video"
-                      >
-                        Your browser does not support HTML5 video.
-                      </video>
+                      <div className="preview-poster-media-wrap is-video">
+                        <video
+                          ref={(el) => {
+                            if (el) el.muted = true;
+                          }}
+                          src={url}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          preload="auto"
+                          controls
+                          className="preview-poster-video"
+                          onLoadedMetadata={(e) => {
+                            try {
+                              e.currentTarget.muted = true;
+                              const p = e.currentTarget.play();
+                              if (p !== undefined) p.catch(() => {});
+                            } catch (_) {}
+                          }}
+                        >
+                          Your browser does not support HTML5 video.
+                        </video>
+                      </div>
                     ) : (
                       <img
                         src={url}

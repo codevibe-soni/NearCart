@@ -65,15 +65,31 @@ export default function AnnouncementPoster({ portal = 'STUDENT' }) {
         return (
           <div key={item._id} className="portal-announcement-card">
             {mediaUrl && (
-              <div className="portal-announcement-media-wrap">
+              <div className={`portal-announcement-media-wrap ${mediaType === 'video' ? 'is-video' : 'is-image'}`}>
                 {mediaType === 'video' ? (
                   <video
+                    ref={(el) => {
+                      if (el) el.muted = true;
+                    }}
                     src={mediaUrl}
-                    controls
+                    autoPlay
                     muted
+                    loop
                     playsInline
-                    preload="metadata"
+                    preload="auto"
+                    controls
                     className="portal-announcement-video"
+                    onLoadedMetadata={(e) => {
+                      try {
+                        e.currentTarget.muted = true;
+                        const playPromise = e.currentTarget.play();
+                        if (playPromise !== undefined) {
+                          playPromise.catch(() => {});
+                        }
+                      } catch {
+                        // Handle browser autoplay policy gracefully
+                      }
+                    }}
                   >
                     Your browser does not support the video tag.
                   </video>
