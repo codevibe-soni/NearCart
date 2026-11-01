@@ -10,6 +10,11 @@ import {
   deleteShopAdmin,
   previewCleanData,
   executeCleanData,
+  getAdminCoupons,
+  createAdminCoupon,
+  updateAdminCoupon,
+  toggleAdminCoupon,
+  deleteAdminCoupon,
 } from '../controllers/adminController.js';
 import { getInstallationAnalytics } from '../controllers/analyticsController.js';
 import {
@@ -63,5 +68,12 @@ router.get('/announcements/:id', getAnnouncementById);
 router.put('/announcements/:id', posterMediaUpload.single('poster'), updateAnnouncement);
 router.patch('/announcements/:id/toggle', togglePublishAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
+
+// Global Coupon Management routes
+router.get('/coupons', getAdminCoupons);
+router.post('/coupons', createAdminCoupon);
+router.put('/coupons/:id', updateAdminCoupon);
+router.patch('/coupons/:id/toggle', toggleAdminCoupon);
+router.delete('/coupons/:id', deleteAdminCoupon);
 
 export default router;

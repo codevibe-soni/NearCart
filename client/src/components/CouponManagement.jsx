@@ -17,7 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-export default function CouponManagement({ shop }) {
+export default function CouponManagement({ shop, isAdmin = false }) {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,17 +48,19 @@ export default function CouponManagement({ shop }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (shop?._id) {
+    if (isAdmin || shop?._id) {
       fetchCoupons();
     }
-  }, [shop?._id]);
+  }, [isAdmin, shop?._id]);
 
   const fetchCoupons = async () => {
     try {
       setLoading(true);
       setError('');
-      const shopParam = shop?._id ? `?shopId=${shop._id}` : '';
-      const res = await api.get(`/shopkeeper/coupons${shopParam}`);
+      const endpoint = isAdmin
+        ? '/admin/coupons'
+        : `/shopkeeper/coupons${shop?._id ? `?shopId=${shop._id}` : ''}`;
+      const res = await api.get(endpoint);
       if (res.success) {
         setCoupons(res.coupons || []);
       } else {
@@ -144,11 +146,19 @@ export default function CouponManagement({ shop }) {
     try {
       setSaving(true);
       let res;
-      const shopParam = shop?._id ? `?shopId=${shop._id}` : '';
-      if (editingCoupon) {
-        res = await api.put(`/shopkeeper/coupons/${editingCoupon._id}${shopParam}`, formData);
+      if (isAdmin) {
+        if (editingCoupon) {
+          res = await api.put(`/admin/coupons/${editingCoupon._id}`, formData);
+        } else {
+          res = await api.post('/admin/coupons', formData);
+        }
       } else {
-        res = await api.post(`/shopkeeper/coupons${shopParam}`, formData);
+        const shopParam = shop?._id ? `?shopId=${shop._id}` : '';
+        if (editingCoupon) {
+          res = await api.put(`/shopkeeper/coupons/${editingCoupon._id}${shopParam}`, formData);
+        } else {
+          res = await api.post(`/shopkeeper/coupons${shopParam}`, formData);
+        }
       }
 
       if (res.success) {
@@ -167,8 +177,10 @@ export default function CouponManagement({ shop }) {
 
   const handleToggleActive = async (couponId, currentStatus) => {
     try {
-      const shopParam = shop?._id ? `?shopId=${shop._id}` : '';
-      const res = await api.patch(`/shopkeeper/coupons/${couponId}/toggle${shopParam}`);
+      const endpoint = isAdmin
+        ? `/admin/coupons/${couponId}/toggle`
+        : `/shopkeeper/coupons/${couponId}/toggle${shop?._id ? `?shopId=${shop._id}` : ''}`;
+      const res = await api.patch(endpoint);
       if (res.success) {
         setCoupons((prev) =>
           prev.map((c) => (c._id === couponId ? { ...c, isActive: !currentStatus } : c))
@@ -192,8 +204,10 @@ export default function CouponManagement({ shop }) {
     const { id, code } = deleteTarget;
     setDeleteTarget(null);
     try {
-      const shopParam = shop?._id ? `?shopId=${shop._id}` : '';
-      const res = await api.delete(`/shopkeeper/coupons/${id}${shopParam}`);
+      const endpoint = isAdmin
+        ? `/admin/coupons/${id}`
+        : `/shopkeeper/coupons/${id}${shop?._id ? `?shopId=${shop._id}` : ''}`;
+      const res = await api.delete(endpoint);
       if (res.success) {
         setCoupons((prev) => prev.filter((c) => c._id !== id));
         setSuccess(`Coupon "${code}" deleted successfully`);
@@ -235,7 +249,7 @@ export default function CouponManagement({ shop }) {
     return 'cpn-card';
   };
 
-  if (!shop) {
+  if (!isAdmin && !shop) {
     return (
       <div className="cpn-no-shop">
         <AlertCircle style={{ width: '2.25rem', height: '2.25rem', color: 'var(--cpn-warning)', margin: '0 auto' }} />
@@ -256,19 +270,21 @@ export default function CouponManagement({ shop }) {
         <div>
           <h2 className="cpn-header-title">
             <Tag style={{ width: '1.25rem', height: '1.25rem', color: 'rgba(255,255,255,0.85)' }} />
-            Coupons
+            {isAdmin ? 'Global Coupons' : 'Coupons'}
           </h2>
           <p className="cpn-header-subtitle">
-            Create and manage discount coupons for your shop
+            {isAdmin
+              ? 'Create and manage platform-wide coupons usable across all NearCart shops'
+              : 'Create and manage discount coupons for your shop'}
           </p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="cpn-btn-create"
-          aria-label="Create new coupon"
+          aria-label={isAdmin ? 'Create new global coupon' : 'Create new coupon'}
         >
           <Plus style={{ width: '1rem', height: '1rem' }} />
-          Create Coupon
+          {isAdmin ? 'Create Global Coupon' : 'Create Coupon'}
         </button>
       </div>
 
@@ -354,10 +370,25 @@ export default function CouponManagement({ shop }) {
                         )}
                       </button>
                     </span>
-                    <span className={`cpn-status ${status.cls}`} aria-label={`Status: ${status.label}`}>
-                      <span className="cpn-status-dot" aria-hidden="true"></span>
-                      {status.label}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '9999px',
+                          background: coupon.couponType === 'GLOBAL' ? '#e0f2fe' : '#f1f5f9',
+                          color: coupon.couponType === 'GLOBAL' ? '#0284c7' : '#475569',
+                          border: `1px solid ${coupon.couponType === 'GLOBAL' ? '#bae6fd' : '#e2e8f0'}`,
+                        }}
+                      >
+                        {coupon.couponType === 'GLOBAL' ? '🌐 Global' : '🏪 Shop'}
+                      </span>
+                      <span className={`cpn-status ${status.cls}`} aria-label={`Status: ${status.label}`}>
+                        <span className="cpn-status-dot" aria-hidden="true"></span>
+                        {status.label}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Description */}

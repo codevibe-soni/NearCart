@@ -49,29 +49,52 @@ export const applyCoupon = async (req, res) => {
       });
     }
 
-    const query = {
-      code: couponCode.trim().toUpperCase(),
+    const formattedCode = couponCode.trim().toUpperCase();
+
+    // Query active candidate coupons matching the normalized code
+    const candidateCoupons = await Coupon.find({
+      code: formattedCode,
       isActive: true,
-    };
+    });
 
-    if (shopId) {
-      query.$or = [{ shopId: null }, { shopId: shopId }];
-    }
-
-    const coupon = await Coupon.findOne(query);
-
-    if (!coupon) {
+    if (!candidateCoupons || candidateCoupons.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Invalid or inactive coupon code',
       });
     }
 
-    if (shopId && coupon.shopId && coupon.shopId.toString() !== shopId.toString()) {
+    // Filter coupons applicable to this shop context
+    const applicableCoupons = candidateCoupons.filter((c) => {
+      if (c.couponType === 'GLOBAL' || !c.shopId) return true;
+      return shopId && c.shopId.toString() === shopId.toString();
+    });
+
+    if (applicableCoupons.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'This coupon is not valid for items in your cart',
+        message: 'This coupon is not valid for items from this shop',
       });
+    }
+
+    // Reject ambiguous matches if code exists as both GLOBAL and SHOP_SPECIFIC for this checkout shop
+    if (applicableCoupons.length > 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ambiguous coupon code detected across scopes. Please use a unique coupon code.',
+      });
+    }
+
+    const coupon = applicableCoupons[0];
+
+    // Strict scope validation against checkout shop
+    if (coupon.couponType === 'SHOP_SPECIFIC' && coupon.shopId) {
+      if (!shopId || coupon.shopId.toString() !== shopId.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'This coupon is only valid for items from its assigned shop',
+        });
+      }
     }
 
     const now = new Date();
@@ -114,6 +137,7 @@ export const applyCoupon = async (req, res) => {
       message: 'Coupon applied successfully',
       data: {
         code: coupon.code,
+        couponType: coupon.couponType || (coupon.shopId ? 'SHOP_SPECIFIC' : 'GLOBAL'),
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
         discountAmount,
@@ -135,6 +159,13 @@ export const applyCoupon = async (req, res) => {
  * @access  Private (Student)
  */
 export const createOrder = async (req, res) => {
+  let couponDoc = null;
+  let couponReserved = false;
+  let createdOrder = null;
+  const appliedStockUpdates = [];
+  let session = null;
+  let useTransaction = false;
+
   try {
     const { addressId, paymentMethod = 'COD', couponCode, notes, isBuyNow, buyNowItem, idempotencyKey, deliveryDistance: reqDeliveryDistance } = req.body;
     const key = idempotencyKey || req.headers['x-idempotency-key'] || null;
@@ -285,6 +316,7 @@ export const createOrder = async (req, res) => {
 
       stockUpdates.push({
         product,
+        originalStock: product.stock,
         newStock: product.stock - quantity,
       });
     } else {
@@ -372,6 +404,7 @@ export const createOrder = async (req, res) => {
 
         stockUpdates.push({
           product,
+          originalStock: product.stock,
           newStock: product.stock - item.quantity,
         });
       }
@@ -401,33 +434,121 @@ export const createOrder = async (req, res) => {
 
     // 6. Validate & calculate coupon discount server-side if provided
     let discountAmount = 0;
-    let couponDoc = null;
+    couponDoc = null;
+    couponReserved = false;
+
     if (couponCode && couponCode.trim()) {
-      couponDoc = await Coupon.findOne({
-        code: couponCode.trim().toUpperCase(),
+      const formattedCode = couponCode.trim().toUpperCase();
+      const candidateCoupons = await Coupon.find({
+        code: formattedCode,
         isActive: true,
-        $or: [{ shopId: null }, { shopId: shop._id }],
       });
 
-      if (couponDoc) {
-        const now = new Date();
-        const validDates = now >= new Date(couponDoc.startDate) && now <= new Date(couponDoc.endDate);
-        const validLimit = couponDoc.usageLimit === null || couponDoc.usedCount < couponDoc.usageLimit;
-        const validMinOrder = calculatedSubtotal >= couponDoc.minimumOrderAmount;
-        const validShop = !couponDoc.shopId || couponDoc.shopId.toString() === shop._id.toString();
+      if (!candidateCoupons || candidateCoupons.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or inactive coupon code',
+        });
+      }
 
-        if (validDates && validLimit && validMinOrder && validShop) {
-          if (couponDoc.discountType === 'PERCENTAGE') {
-            discountAmount = (calculatedSubtotal * couponDoc.discountValue) / 100;
-            if (couponDoc.maximumDiscount && couponDoc.maximumDiscount > 0) {
-              discountAmount = Math.min(discountAmount, couponDoc.maximumDiscount);
-            }
-          } else if (couponDoc.discountType === 'FIXED') {
-            discountAmount = couponDoc.discountValue;
-          }
-          discountAmount = Math.min(discountAmount, calculatedSubtotal);
-          discountAmount = Math.round(discountAmount * 100) / 100;
+      const applicableCoupons = candidateCoupons.filter((c) => {
+        if (c.couponType === 'GLOBAL' || !c.shopId) return true;
+        return c.shopId.toString() === shop._id.toString();
+      });
+
+      if (applicableCoupons.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'This coupon is not valid for items from this shop',
+        });
+      }
+
+      // Explicit HTTP 400 rejection on ambiguity, consistent with applyCoupon
+      if (applicableCoupons.length > 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ambiguous coupon code detected across scopes. Please use a unique coupon code.',
+        });
+      }
+
+      couponDoc = applicableCoupons[0];
+
+      // Strict scope validation against checkout shop
+      if (couponDoc.couponType === 'SHOP_SPECIFIC' && couponDoc.shopId) {
+        if (couponDoc.shopId.toString() !== shop._id.toString()) {
+          return res.status(400).json({
+            success: false,
+            message: 'This coupon is only valid for items from its assigned shop',
+          });
         }
+      }
+
+      const now = new Date();
+      if (now < new Date(couponDoc.startDate) || now > new Date(couponDoc.endDate)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Coupon is expired or not yet active',
+        });
+      }
+
+      if (couponDoc.usageLimit !== null && couponDoc.usedCount >= couponDoc.usageLimit) {
+        return res.status(400).json({
+          success: false,
+          message: 'Coupon usage limit reached',
+        });
+      }
+
+      if (calculatedSubtotal < couponDoc.minimumOrderAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `Minimum order amount of ₹${couponDoc.minimumOrderAmount} required for this coupon`,
+        });
+      }
+
+      if (couponDoc.discountType === 'PERCENTAGE') {
+        discountAmount = (calculatedSubtotal * couponDoc.discountValue) / 100;
+        if (couponDoc.maximumDiscount && couponDoc.maximumDiscount > 0) {
+          discountAmount = Math.min(discountAmount, couponDoc.maximumDiscount);
+        }
+      } else if (couponDoc.discountType === 'FIXED') {
+        discountAmount = couponDoc.discountValue;
+      }
+      discountAmount = Math.min(discountAmount, calculatedSubtotal);
+      discountAmount = Math.round(discountAmount * 100) / 100;
+
+      // Conditional atomic increment enforcing active status, validity dates, shop/scope, and usageLimit
+      if (discountAmount > 0) {
+        const now = new Date();
+        const scopeFilter =
+          couponDoc.couponType === 'SHOP_SPECIFIC' || couponDoc.shopId
+            ? { shopId: shop._id }
+            : { $or: [{ shopId: null }, { couponType: 'GLOBAL' }] };
+
+        const atomicFilter = {
+          _id: couponDoc._id,
+          isActive: true,
+          startDate: { $lte: now },
+          endDate: { $gte: now },
+          ...scopeFilter,
+          $or: [
+            { usageLimit: null },
+            { $expr: { $lt: ['$usedCount', '$usageLimit'] } },
+          ],
+        };
+
+        const reservedCoupon = await Coupon.findOneAndUpdate(
+          atomicFilter,
+          { $inc: { usedCount: 1 } },
+          { new: true }
+        );
+
+        if (!reservedCoupon) {
+          return res.status(400).json({
+            success: false,
+            message: 'Coupon is either inactive, expired, invalid for this shop, or usage limit has just been reached.',
+          });
+        }
+        couponReserved = true;
       }
     }
 
@@ -476,32 +597,59 @@ const totalAmount = Math.max(
   imageUrl: shop.upiQrImage || '',
     };
 
+    // Attempt transaction if supported by MongoDB deployment (replica set)
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+      useTransaction = true;
+    } catch (txErr) {
+      session = null;
+      useTransaction = false;
+    }
+
+    const orderOptions = useTransaction && session ? { session } : {};
+
     // 9. Create Order Document (with idempotency handling)
     let order;
     try {
-      order = await Order.create({
-        orderNumber,
-        user: req.user._id,
-        customerPhone: cleanPhone,
-        shop: shop._id,
-        items: orderItems,
-        address: address._id,
-        subtotal: calculatedSubtotal,
-        packingCharges,
-        deliveryFee,
-        deliveryDistance,
-        discount: discountAmount,
-        gstAmount,
-        totalAmount,
-        paymentMethod,
-        paymentStatus: 'PENDING',
-        upiQrSnapshot,
-        orderStatus: 'PLACED',
-        notes: notes ? notes.trim() : '',
-        ...(key ? { idempotencyKey: key } : {}),
-      });
+      const orderDocs = await Order.create(
+        [
+          {
+            orderNumber,
+            user: req.user._id,
+            customerPhone: cleanPhone,
+            shop: shop._id,
+            items: orderItems,
+            address: address._id,
+            subtotal: calculatedSubtotal,
+            packingCharges,
+            deliveryFee,
+            deliveryDistance,
+            discount: discountAmount,
+            gstAmount,
+            totalAmount,
+            paymentMethod,
+            paymentStatus: 'PENDING',
+            upiQrSnapshot,
+            orderStatus: 'PLACED',
+            notes: notes ? notes.trim() : '',
+            ...(key ? { idempotencyKey: key } : {}),
+          },
+        ],
+        orderOptions
+      );
+      order = orderDocs[0];
+      createdOrder = order;
     } catch (createErr) {
       if (createErr.code === 11000 && key) {
+        if (useTransaction && session) {
+          try {
+            await session.abortTransaction();
+          } catch (e) {}
+          session.endSession();
+          session = null;
+          useTransaction = false;
+        }
         const existingOrder = await Order.findOne({ user: req.user._id, idempotencyKey: key })
           .populate([
             { path: 'shop', select: 'name phone address bannerImage owner' },
@@ -509,6 +657,10 @@ const totalAmount = Math.max(
             { path: 'items.product', select: 'name images unit' },
           ]);
         if (existingOrder) {
+          if (couponReserved && couponDoc) {
+            await Coupon.findByIdAndUpdate(couponDoc._id, { $inc: { usedCount: -1 } });
+            couponReserved = false; // Prevent double rollback in catch
+          }
           return res.status(200).json({
             success: true,
             message: 'Order created successfully',
@@ -522,25 +674,35 @@ const totalAmount = Math.max(
     // 9b. Create initial unassigned Delivery Record (status: PENDING, deliveryBoy: null)
     try {
       const Delivery = (await import('../models/Delivery.js')).default;
-      await Delivery.create({
-        order: order._id,
-        deliveryBoy: null,
-        status: 'PENDING',
-      });
+      await Delivery.create(
+        [
+          {
+            order: order._id,
+            deliveryBoy: null,
+            status: 'PENDING',
+          },
+        ],
+        orderOptions
+      );
     } catch (delErr) {
       console.warn('Initial Delivery document creation notice:', delErr.message);
     }
 
     // Create corresponding Payment document if required by schema
     try {
-      await Payment.create({
-        order: order._id,
-        user: req.user._id,
-        amount: totalAmount,
-        method: paymentMethod === 'COD' ? 'COD' : 'UPI',
-        status: 'PENDING',
-        upiQrSnapshot,
-      });
+      await Payment.create(
+        [
+          {
+            order: order._id,
+            user: req.user._id,
+            amount: totalAmount,
+            method: paymentMethod === 'COD' ? 'COD' : 'UPI',
+            status: 'PENDING',
+            upiQrSnapshot,
+          },
+        ],
+        orderOptions
+      );
     } catch (payErr) {
       console.warn('Payment document creation notice:', payErr.message);
     }
@@ -551,19 +713,22 @@ const totalAmount = Math.max(
       if (update.newStock === 0) {
         update.product.isAvailable = false;
       }
-      await update.product.save();
+      await update.product.save(orderOptions);
+      appliedStockUpdates.push(update);
     }
 
-    // 11. Increment coupon usage count if applied
-    if (couponDoc && discountAmount > 0) {
-      couponDoc.usedCount += 1;
-      await couponDoc.save();
-    }
-
-    // 12. Clear Student's cart only if standard cart flow
+    // 11. Clear Student's cart only if standard cart flow
     if (cartToClear) {
       cartToClear.items = [];
-      await cartToClear.save();
+      await cartToClear.save(orderOptions);
+    }
+
+    // Commit transaction after all document writes succeed
+    if (useTransaction && session) {
+      await session.commitTransaction();
+      session.endSession();
+      session = null;
+      useTransaction = false;
     }
 
     await order.populate([
@@ -904,6 +1069,62 @@ try {
       data: order,
     });
   } catch (error) {
+    if (useTransaction && session) {
+      try {
+        await session.abortTransaction();
+      } catch (txErr) {
+        console.error('Failed to abort transaction:', txErr);
+      } finally {
+        session.endSession();
+      }
+    }
+
+    // 1. Compensated rollback if coupon was reserved but order creation failed
+    if (couponReserved && couponDoc) {
+      try {
+        await Coupon.findByIdAndUpdate(couponDoc._id, { $inc: { usedCount: -1 } });
+      } catch (rbErr) {
+        console.error('Failed to rollback coupon usage reservation:', rbErr);
+      }
+      couponReserved = false;
+    }
+
+    // 2. Compensating rollback for standalone MongoDB (when transactions not available)
+    if (!useTransaction) {
+      if (appliedStockUpdates.length > 0) {
+        for (const update of appliedStockUpdates) {
+          try {
+            update.product.stock = update.originalStock;
+            if (update.originalStock > 0) {
+              update.product.isAvailable = true;
+            }
+            await update.product.save();
+          } catch (stkErr) {
+            console.error('Failed to rollback product stock:', stkErr);
+          }
+        }
+      }
+
+      if (createdOrder) {
+        try {
+          await Order.findByIdAndDelete(createdOrder._id);
+        } catch (ordErr) {
+          console.error('Failed to cleanup partial order:', ordErr);
+        }
+        try {
+          const Delivery = (await import('../models/Delivery.js')).default;
+          await Delivery.deleteMany({ order: createdOrder._id });
+        } catch (delErr) {
+          console.error('Failed to cleanup partial delivery:', delErr);
+        }
+        try {
+          await Payment.deleteMany({ order: createdOrder._id });
+        } catch (payErr) {
+          console.error('Failed to cleanup partial payment:', payErr);
+        }
+      }
+    }
+
     console.error('Error creating order:', error);
     return res.status(500).json({
       success: false,

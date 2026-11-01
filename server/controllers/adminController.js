@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import User from '../models/User.js';
+import Coupon from '../models/Coupon.js';
 
 // @route   GET /api/admin/users
 // @desc    Get all users list for admin user management
@@ -522,4 +523,295 @@ export const executeCleanData = async (req, res, next) => {
     next(error);
   }
 };
+
+// ==========================================
+// GLOBAL COUPON MANAGEMENT FOR ADMIN
+// ==========================================
+
+// @route   GET /api/admin/coupons
+// @desc    Get all global coupons (or filter by ?type=GLOBAL|SHOP_SPECIFIC|ALL)
+// @access  Private/Admin
+export const getAdminCoupons = async (req, res, next) => {
+  try {
+    const { type } = req.query;
+    let filter = {};
+    if (type === 'SHOP_SPECIFIC') {
+      filter.couponType = 'SHOP_SPECIFIC';
+    } else if (type === 'ALL') {
+      // no filter
+    } else {
+      // Default to GLOBAL coupons for platform-wide coupon management
+      filter.couponType = 'GLOBAL';
+    }
+
+    const coupons = await Coupon.find(filter)
+      .populate('shopId', 'name address')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: coupons.length,
+      coupons,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   POST /api/admin/coupons
+// @desc    Create a new platform-wide GLOBAL coupon
+// @access  Private/Admin
+export const createAdminCoupon = async (req, res, next) => {
+  try {
+    const {
+      code,
+      description,
+      discountType,
+      discountValue,
+      minimumOrderAmount,
+      maximumDiscount,
+      usageLimit,
+      startDate,
+      endDate,
+    } = req.body;
+
+    if (!code || !code.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Coupon code is required',
+      });
+    }
+
+    const formattedCode = code.trim().toUpperCase();
+
+    // Check if code already exists as a GLOBAL coupon
+    const existingGlobal = await Coupon.findOne({
+      code: formattedCode,
+      couponType: 'GLOBAL',
+    });
+    if (existingGlobal) {
+      return res.status(400).json({
+        success: false,
+        message: 'A global coupon with this code already exists. Please choose a different code.',
+      });
+    }
+
+    // Check if code is already in use by an active shop-specific coupon to prevent code ambiguity
+    const existingShopCoupon = await Coupon.findOne({
+      code: formattedCode,
+      couponType: 'SHOP_SPECIFIC',
+      isActive: true,
+    }).populate('shopId', 'name');
+
+    if (existingShopCoupon) {
+      const shopName = existingShopCoupon.shopId?.name || 'an existing shop';
+      return res.status(400).json({
+        success: false,
+        message: `Coupon code "${formattedCode}" is currently in use by ${shopName}. To prevent checkout ambiguity, please choose a different code.`,
+      });
+    }
+
+    if (!discountType || !['PERCENTAGE', 'FIXED'].includes(discountType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount type must be either PERCENTAGE or FIXED',
+      });
+    }
+
+    const numValue = Number(discountValue);
+    if (isNaN(numValue) || numValue <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount value must be greater than 0',
+      });
+    }
+
+    if (discountType === 'PERCENTAGE' && numValue > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Percentage discount cannot exceed 100%',
+      });
+    }
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required',
+      });
+    }
+
+    if (new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be greater than or equal to start date',
+      });
+    }
+
+    const newCoupon = await Coupon.create({
+      code: formattedCode,
+      couponType: 'GLOBAL',
+      description: description ? description.trim() : '',
+      discountType,
+      discountValue: numValue,
+      minimumOrderAmount: Number(minimumOrderAmount) || 0,
+      maximumDiscount:
+        maximumDiscount !== undefined && maximumDiscount !== '' && maximumDiscount !== null
+          ? Number(maximumDiscount)
+          : null,
+      usageLimit:
+        usageLimit !== undefined && usageLimit !== '' && usageLimit !== null
+          ? Number(usageLimit)
+          : null,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      shopId: null,
+      isActive: true,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Global coupon created successfully',
+      coupon: newCoupon,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   PUT /api/admin/coupons/:id
+// @desc    Update an existing global coupon
+// @access  Private/Admin
+export const updateAdminCoupon = async (req, res, next) => {
+  try {
+    const coupon = await Coupon.findById(req.params.id);
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'Coupon not found' });
+    }
+
+    const {
+      code,
+      description,
+      discountType,
+      discountValue,
+      minimumOrderAmount,
+      maximumDiscount,
+      usageLimit,
+      startDate,
+      endDate,
+      isActive,
+    } = req.body;
+
+    if (code && code.trim().toUpperCase() !== coupon.code) {
+      const formattedCode = code.trim().toUpperCase();
+
+      const existingGlobal = await Coupon.findOne({
+        code: formattedCode,
+        couponType: 'GLOBAL',
+        _id: { $ne: coupon._id },
+      });
+      if (existingGlobal) {
+        return res.status(400).json({
+          success: false,
+          message: 'A global coupon with this code already exists',
+        });
+      }
+
+      const existingShopCoupon = await Coupon.findOne({
+        code: formattedCode,
+        couponType: 'SHOP_SPECIFIC',
+        isActive: true,
+      });
+      if (existingShopCoupon) {
+        return res.status(400).json({
+          success: false,
+          message: `Coupon code "${formattedCode}" is currently used by a shop-specific coupon. Please choose a different code.`,
+        });
+      }
+
+      coupon.code = formattedCode;
+    }
+
+    if (description !== undefined) coupon.description = description.trim();
+    if (discountType && ['PERCENTAGE', 'FIXED'].includes(discountType)) coupon.discountType = discountType;
+    if (discountValue !== undefined) {
+      const val = Number(discountValue);
+      if (val > 0) {
+        if (coupon.discountType === 'PERCENTAGE' && val > 100) {
+          return res.status(400).json({ success: false, message: 'Percentage discount cannot exceed 100%' });
+        }
+        coupon.discountValue = val;
+      }
+    }
+    if (minimumOrderAmount !== undefined) coupon.minimumOrderAmount = Number(minimumOrderAmount) || 0;
+    if (maximumDiscount !== undefined)
+      coupon.maximumDiscount = maximumDiscount !== '' && maximumDiscount !== null ? Number(maximumDiscount) : null;
+    if (usageLimit !== undefined)
+      coupon.usageLimit = usageLimit !== '' && usageLimit !== null ? Number(usageLimit) : null;
+    if (startDate) coupon.startDate = new Date(startDate);
+    if (endDate) coupon.endDate = new Date(endDate);
+    if (isActive !== undefined) coupon.isActive = Boolean(isActive);
+
+    if (coupon.endDate < coupon.startDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be greater than or equal to start date',
+      });
+    }
+
+    await coupon.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Global coupon updated successfully',
+      coupon,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   PATCH /api/admin/coupons/:id/toggle
+// @desc    Toggle coupon active status
+// @access  Private/Admin
+export const toggleAdminCoupon = async (req, res, next) => {
+  try {
+    const coupon = await Coupon.findById(req.params.id);
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'Coupon not found' });
+    }
+
+    coupon.isActive = !coupon.isActive;
+    await coupon.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Coupon ${coupon.isActive ? 'activated' : 'deactivated'} successfully`,
+      coupon,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @route   DELETE /api/admin/coupons/:id
+// @desc    Delete a coupon
+// @access  Private/Admin
+export const deleteAdminCoupon = async (req, res, next) => {
+  try {
+    const coupon = await Coupon.findById(req.params.id);
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'Coupon not found' });
+    }
+
+    await Coupon.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Coupon deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 

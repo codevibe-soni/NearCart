@@ -5,9 +5,17 @@ const couponSchema = new mongoose.Schema(
     code: {
       type: String,
       required: [true, 'Coupon code is required'],
-      unique: true,
       uppercase: true,
       trim: true,
+    },
+    couponType: {
+      type: String,
+      enum: {
+        values: ['GLOBAL', 'SHOP_SPECIFIC'],
+        message: '{VALUE} is not a valid coupon type',
+      },
+      default: 'GLOBAL',
+      required: true,
     },
     description: {
       type: String,
@@ -85,8 +93,30 @@ const couponSchema = new mongoose.Schema(
   }
 );
 
+// Scoped Unique Indexes:
+// 1. GLOBAL coupons: code must be globally unique
+couponSchema.index(
+  { code: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { couponType: 'GLOBAL' },
+    name: 'unique_global_coupon_code',
+  }
+);
+
+// 2. SHOP_SPECIFIC coupons: code unique per shop (different shops can reuse same code)
+couponSchema.index(
+  { code: 1, shopId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { couponType: 'SHOP_SPECIFIC' },
+    name: 'unique_shop_coupon_code',
+  }
+);
+
 couponSchema.index({ isActive: 1 });
 couponSchema.index({ shopId: 1, isActive: 1 });
+couponSchema.index({ couponType: 1, isActive: 1 });
 
 const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
 

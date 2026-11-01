@@ -20,9 +20,11 @@ import {
   Smartphone,
   Store,
   Megaphone,
+  Tag,
 } from 'lucide-react';
 
 import CampaignManagement from '../components/CampaignManagement.jsx';
+import CouponManagement from '../components/CouponManagement.jsx';
 export default function Admin() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -351,7 +353,15 @@ export default function Admin() {
         >
           <Megaphone size={18} /> Posters & Announcements
         </button>
+        <button
+          onClick={() => handleTabChange('COUPONS_MANAGEMENT')}
+          className={activeTab === 'COUPONS_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}
+        >
+          <Tag size={18} /> Global Coupons
+        </button>
       </div>
+
+      {activeTab === 'COUPONS_MANAGEMENT' && <CouponManagement isAdmin={true} />}
 
       {activeTab === 'SHOP_MANAGEMENT' && <AdminShopsTab />}
 

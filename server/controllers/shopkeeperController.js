@@ -1313,12 +1313,21 @@ export const createShopkeeperCoupon = async (req, res, next) => {
 
     const formattedCode = code.trim().toUpperCase();
 
-    // Check if code already exists globally
-    const existingCoupon = await Coupon.findOne({ code: formattedCode });
-    if (existingCoupon) {
+    // Check if code is already reserved by a platform-wide GLOBAL coupon
+    const globalCoupon = await Coupon.findOne({ code: formattedCode, couponType: 'GLOBAL' });
+    if (globalCoupon) {
       return res.status(400).json({
         success: false,
-        message: 'A coupon with this code already exists. Please choose a different code.',
+        message: 'This coupon code is reserved by a platform-wide coupon. Please choose a different code.',
+      });
+    }
+
+    // Check if code already exists for this specific shop
+    const existingShopCoupon = await Coupon.findOne({ code: formattedCode, shopId: shop._id });
+    if (existingShopCoupon) {
+      return res.status(400).json({
+        success: false,
+        message: 'A coupon with this code already exists for your shop. Please choose a different code.',
       });
     }
 
@@ -1360,6 +1369,7 @@ export const createShopkeeperCoupon = async (req, res, next) => {
 
     const newCoupon = await Coupon.create({
       code: formattedCode,
+      couponType: 'SHOP_SPECIFIC',
       description: description ? description.trim() : '',
       discountType,
       discountValue: numValue,
@@ -1415,11 +1425,26 @@ export const updateShopkeeperCoupon = async (req, res, next) => {
 
     if (code && code.trim().toUpperCase() !== coupon.code) {
       const formattedCode = code.trim().toUpperCase();
-      const existing = await Coupon.findOne({ code: formattedCode });
+
+      // Check if reserved by a GLOBAL coupon
+      const globalCoupon = await Coupon.findOne({ code: formattedCode, couponType: 'GLOBAL' });
+      if (globalCoupon) {
+        return res.status(400).json({
+          success: false,
+          message: 'This coupon code is reserved by a platform-wide coupon. Please choose a different code.',
+        });
+      }
+
+      // Check if already used by this shop on another coupon
+      const existing = await Coupon.findOne({
+        code: formattedCode,
+        shopId: shop._id,
+        _id: { $ne: coupon._id },
+      });
       if (existing) {
         return res.status(400).json({
           success: false,
-          message: 'A coupon with this code already exists',
+          message: 'A coupon with this code already exists for your shop',
         });
       }
       coupon.code = formattedCode;
