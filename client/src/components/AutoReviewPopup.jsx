@@ -14,7 +14,66 @@ export default function AutoReviewPopup() {
   // Cache of fetched reviews per order to avoid stale GET after a POST
   const [orderReviewsCache, setOrderReviewsCache] = useState({});
 
-  // Check if a specific delivered order is fully reviewed across all targets
+  // Helper to get delivered timestamp (uses Delivery.deliveredAt if present)
+const getDeliveredAt = (order) => {
+  // Prefer delivery subdocument's deliveredAt, otherwise fall back to order.deliveredAt
+  return order.delivery?.deliveredAt || order.deliveredAt || null;
+};
+
+// Check if a specific delivered order is fully reviewed across all targets
+// and also respects the 4‑day eligibility window.
+const checkIfFullyReviewed = async (orderId, orderItems, order) => {
+  // ---- 4‑day expiry check ----
+  const deliveredAt = getDeliveredAt(order);
+  if (!deliveredAt) return false; // No delivery timestamp → cannot be eligible yet
+  const now = new Date();
+  const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
+  if (now - new Date(deliveredAt) > FOUR_DAYS_MS) {
+    // Past the eligibility window – treat as fully reviewed so popup never shows
+    return true;
+  }
+
+  // First try to use cached reviews for this order to avoid stale GET after a POST
+  if (orderReviewsCache[orderId]) {
+    const existingReviews = orderReviewsCache[orderId];
+    const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
+    let allProductsReviewed = true;
+    if (orderItems && orderItems.length > 0) {
+      allProductsReviewed = orderItems.every((item) => {
+        if (!item.product) return true;
+        const pId = typeof item.product === 'object' ? item.product._id : item.product;
+        return existingReviews.some(
+          (r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId)
+        );
+      });
+    }
+    return hasShopReview && allProductsReviewed;
+  }
+
+  // Fallback to fresh GET if not cached
+  try {
+    const res = await api.get(`/reviews/order/${orderId}`);
+    if (!res || !res.success) return false;
+    const existingReviews = res.data || [];
+    // Cache the result for future checks
+    setOrderReviewsCache((prev) => ({ ...prev, [orderId]: existingReviews }));
+    const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
+    let allProductsReviewed = true;
+    if (orderItems && orderItems.length > 0) {
+      allProductsReviewed = orderItems.every((item) => {
+        if (!item.product) return true;
+        const pId = typeof item.product === 'object' ? item.product._id : item.product;
+        return existingReviews.some(
+          (r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId)
+        );
+      });
+    }
+    return hasShopReview && allProductsReviewed;
+  } catch (err) {
+    console.warn('Error checking order reviews eligibility:', err.message);
+    return false;
+  }
+};
   const checkIfFullyReviewed = async (orderId, orderItems) => {
     // First try to use cached reviews for this order to avoid stale GET after a POST
     if (orderReviewsCache[orderId]) {
