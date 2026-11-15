@@ -15,6 +15,58 @@ import heroPoster from '../assets/hero-poster.jpg';
 import './Student.css';
 
 export default function Student() {
+  // State for dismissed promotion IDs
+  const [dismissedIds, setDismissedIds] = useState([]);
+  // Map of shopId -> promotions array
+  const [promotionsMap, setPromotionsMap] = useState({});
+
+  // Load dismissed promotions once after auth
+  useEffect(() => {
+    let cancelled = false;
+    const loadDismissed = async () => {
+      try {
+        const res = await getDismissedPromotions();
+        if (!cancelled && res.success) {
+          setDismissedIds(res.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load dismissed promotions', err);
+      }
+    };
+    loadDismissed();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch promotions for all displayed shops
+  const fetchAllPromotions = async () => {
+    if (shops.length === 0) return;
+    try {
+      const promoPromises = shops.map(shop => getPromotionsForShop(shop._id));
+      const results = await Promise.all(promoPromises);
+      const newMap = {};
+      results.forEach((resp, idx) => {
+        const shopId = shops[idx]._id;
+        const promos = (resp.success && resp.data) ? resp.data : [];
+        // Filter out dismissed and expired promotions
+        const filtered = promos.filter(p => {
+          const isDismissed = dismissedIds.includes(p._id);
+          const isExpired = Date.now() >= new Date(p.endDate).getTime();
+          return !isDismissed && !isExpired;
+        });
+        newMap[shopId] = filtered;
+      });
+      setPromotionsMap(newMap);
+    } catch (e) {
+      console.error('Error fetching promotions for shops', e);
+    }
+  };
+
+  // Initial load and when shops or dismissedIds change
+  useEffect(() => {
+    fetchAllPromotions();
+    const interval = setInterval(fetchAllPromotions, 30000); // 30‑second polling
+    return () => clearInterval(interval);
+  }, [shops, dismissedIds]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

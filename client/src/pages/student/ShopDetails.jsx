@@ -1,17 +1,70 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { getPromotionsForShop, getDismissedPromotions, dismissPromotion } from '../../services/promotionService';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { getShopById, getProducts } from '../../services/studentService';
 import { ProductCard, LoadingSpinner, EmptyState, SearchBar, formatTimeAMPM, isShopOpen, getShopClosedReason } from '../../components/StudentUIComponents';
 import { Store, ArrowLeft, Phone, MapPin, Star, Clock } from 'lucide-react';
 import api from '../../services/api';
 
-export default function ShopDetails() {
+
+
+  const dismissedRef = useRef([]);
+  const timersRef = useRef(new Map());
+
+  // Fetch promotions for this shop and handle expiry
+  useEffect(() => {
+    if (!shop) return;
+    let mounted = true;
+    const fetchPromos = async () => {
+      try {
+        const [promoRes, dismissedRes] = await Promise.all([
+          getPromotionsForShop(shop._id),
+          getDismissedPromotions(),
+        ]);
+        if (!mounted) return;
+        dismissedRef.current = dismissedRes.data || [];
+        const active = (promoRes.data || []).filter((p) => !dismissedRef.current.includes(p._id));
+        setPromotions(active);
+        scheduleTimers(active);
+      } catch (err) {
+        console.error('Error fetching promotions', err);
+      }
+    };
+    const scheduleTimers = (promos) => {
+      timersRef.current.forEach((tid) => clearTimeout(tid));
+      timersRef.current.clear();
+      promos.forEach((p) => {
+        const remaining = new Date(p.endDate).getTime() - Date.now();
+        if (remaining > 0) {
+          const tid = setTimeout(() => {
+            setPromotions((prev) => prev.filter((pr) => pr._id !== p._id));
+          }, remaining);
+          timersRef.current.set(p._id, tid);
+        }
+      });
+    };
+    fetchPromos();
+    const interval = setInterval(fetchPromos, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      timersRef.current.forEach((tid) => clearTimeout(tid));
+      timersRef.current.clear();
+    };
+  }, [shop]);
+
+  const handleDismiss = async (promoId) => {
+    try {
+      await dismissPromotion(promoId);
+      setPromotions((prev) => prev.filter((p) => p._id !== promoId));
+    } catch (err) {
+      console.error('Dismiss error', err);
+    }
+  };
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-
   const initialSearch = searchParams.get('search') || '';
-
   const [shop, setShop] = useState(null);
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, limit: 24 });
@@ -22,27 +75,10 @@ export default function ShopDetails() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // When shop ID changes, immediately reset shop and product state to avoid stale flash
-  useEffect(() => {
-    setShop(null);
-    setProducts([]);
-    setLoading(true);
-  }, [id]);
+  const dismissedRef = useRef([]);
+  const timersRef = useRef(new Map());
 
-  // Sync search state from URL search parameters
-  useEffect(() => {
-    const q = searchParams.get('search') || '';
-    if (q !== submittedSearch) {
-      setSubmittedSearch(q);
-      setSearchInput(q);
-    }
-  }, [searchParams]);
 
-  const updateUrlParams = (searchVal) => {
-    const params = {};
-    if (searchVal) params.search = searchVal;
-    setSearchParams(params);
-  };
 
   const fetchShopData = async (activeQuery = submittedSearch, activePage = page) => {
     if (!shop) setLoading(true);
@@ -185,7 +221,18 @@ export default function ShopDetails() {
           <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem', flexWrap: 'wrap', minWidth: 0 }}>
               <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-primary)', margin: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', minWidth: 0 }}>
-                {shop.name}
+
+              </h1>
+              {/* Promotion badge on detail header */}
+              {promotions.map((p) => (
+                <DiscountBadge
+                  key={p._id}
+                  discountType={p.discountType}
+                  discountValue={p.discountValue}
+                  maximumDiscount={p.maximumDiscount || 0}
+                />
+              ))}
+
               </h1>
               <span
                 style={{
@@ -281,7 +328,7 @@ export default function ShopDetails() {
           </div>
           <div>
             <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: '#991b1b' }}>
-              {shop.name} is Currently Closed
+ is Currently Closed
             </h4>
             <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: '#b91c1c' }}>
               {closedReason ? (
@@ -294,6 +341,13 @@ export default function ShopDetails() {
         </div>
       )}
 
+
+      {promotions.length > 0 && (
+        <PromotionPopup
+          promotion={promotions[0]}
+          onDismiss={() => handleDismiss(promotions[0]._id)}
+        />
+      )}
 
       {/* Shop Products Section */}
       <div>

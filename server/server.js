@@ -25,6 +25,7 @@ import reviewRoutes from './routes/reviewRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
+import promotionRoutes from './routes/promotionRoutes.js';
 
 import {
   errorHandler,
@@ -79,8 +80,6 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
 };
-
-
 
 // ===============================
 // MIDDLEWARE
@@ -160,6 +159,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/announcements', announcementRoutes);
 
 app.use('/api/campaigns', announcementRoutes);
+
+app.use('/api/promotions', promotionRoutes);
 
 // ===============================
 // TEMPORARY CLOUDINARY TEST

@@ -11,6 +11,7 @@ import Review from './Review.js';
 import Coupon from './Coupon.js';
 import Notification from './Notification.js';
 import Installation from './Installation.js';
+import UserPromotionDismissal from './UserPromotionDismissal.js';
 
 export {
   User,
@@ -26,4 +27,5 @@ export {
   Coupon,
   Notification,
   Installation,
+  UserPromotionDismissal,
 };

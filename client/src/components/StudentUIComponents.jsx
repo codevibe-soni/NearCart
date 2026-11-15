@@ -296,7 +296,14 @@ export function isShopOpen(shop) {
   return !getShopClosureDetails(shop).isClosed;
 }
 
-export function ShopCard({ shop, onClick }) {
+
+
+export function ShopCard({ shop, onClick, promotions = [] }) {
+
+
+
+
+
   const hasTiming = Boolean(shop.openingTime && shop.closingTime);
   const currentlyOpen = isShopOpen(shop);
   const closedReason = !currentlyOpen ? getShopClosedReason(shop) : null;
@@ -394,6 +401,17 @@ export function ShopCard({ shop, onClick }) {
       </div>
 
       <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', flex: 1, lineHeight: '1.4' }}>
+          {shop.description || 'Campus shop providing essential goods.'}
+        </p>
+        {/* Promotion badges */}
+        {promotions.map((p) => (
+          <DiscountBadge
+            key={p._id}
+            discountType={p.discountType}
+            discountValue={p.discountValue}
+            maximumDiscount={p.maximumDiscount || 0}
+          />
+        ))}
         {shop.description || 'Campus shop providing essential goods.'}
       </p>
 
@@ -416,7 +434,8 @@ export function ShopCard({ shop, onClick }) {
         <span>⭐ {shop.rating?.toFixed(1) || '4.5'} ({shop.totalRatings || 0})</span>
         <span>Delivery: ₹{shop.deliveryFee || 0}</span>
       </div>
-    </div>
+    </div >
+    </div >
   );
 }
 
