@@ -83,10 +83,22 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
         setSuccessMsg('Review submitted successfully!');
         await fetchOrderReviews();
         if (onReviewSubmitted) onReviewSubmitted(res.data);
+      } else if (res && !res.success && res.message && /already submitted/i.test(res.message)) {
+        // Duplicate review – refresh existing reviews to hide this target
+        setErrorMsg('You have already submitted this review.');
+        await fetchOrderReviews();
+      } else {
+        setErrorMsg(res && res.message ? res.message : 'Failed to submit review');
       }
     } catch (err) {
       console.error('Review submit error:', err);
-      setErrorMsg(err.message || 'Failed to submit review');
+      const msg = err?.response?.data?.message || err.message || 'Failed to submit review';
+      if (/already submitted/i.test(msg)) {
+        setErrorMsg('You have already submitted this review.');
+        await fetchOrderReviews();
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setSubmittingKey(null);
     }

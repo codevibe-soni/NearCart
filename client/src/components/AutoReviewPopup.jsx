@@ -22,61 +22,20 @@ const getDeliveredAt = (order) => {
 
 // Check if a specific delivered order is fully reviewed across all targets
 // and also respects the 4‑day eligibility window.
-const checkIfFullyReviewed = async (orderId, orderItems, order) => {
-  // ---- 4‑day expiry check ----
-  const deliveredAt = getDeliveredAt(order);
-  if (!deliveredAt) return false; // No delivery timestamp → cannot be eligible yet
-  const now = new Date();
-  const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
-  if (now - new Date(deliveredAt) > FOUR_DAYS_MS) {
-    // Past the eligibility window – treat as fully reviewed so popup never shows
-    return true;
-  }
-
-  // First try to use cached reviews for this order to avoid stale GET after a POST
-  if (orderReviewsCache[orderId]) {
-    const existingReviews = orderReviewsCache[orderId];
-    const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
-    let allProductsReviewed = true;
-    if (orderItems && orderItems.length > 0) {
-      allProductsReviewed = orderItems.every((item) => {
-        if (!item.product) return true;
-        const pId = typeof item.product === 'object' ? item.product._id : item.product;
-        return existingReviews.some(
-          (r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId)
-        );
-      });
+const checkIfFullyReviewed = async (orderId, orderItems, order, skipCache = false) => {
+    // ---- 4‑day eligibility window (96 h) ----
+    const deliveredAt = getDeliveredAt(order);
+    if (!deliveredAt) return true; // missing timestamp => never eligible
+    const deliveredDate = new Date(deliveredAt);
+    if (Number.isNaN(deliveredDate.getTime())) return true; // invalid timestamp => treat as fully reviewed
+    const now = new Date();
+    const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
+    if (now - deliveredDate >= FOUR_DAYS_MS) {
+      return true; // past eligibility window → exclude
     }
-    return hasShopReview && allProductsReviewed;
-  }
 
-  // Fallback to fresh GET if not cached
-  try {
-    const res = await api.get(`/reviews/order/${orderId}`);
-    if (!res || !res.success) return false;
-    const existingReviews = res.data || [];
-    // Cache the result for future checks
-    setOrderReviewsCache((prev) => ({ ...prev, [orderId]: existingReviews }));
-    const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
-    let allProductsReviewed = true;
-    if (orderItems && orderItems.length > 0) {
-      allProductsReviewed = orderItems.every((item) => {
-        if (!item.product) return true;
-        const pId = typeof item.product === 'object' ? item.product._id : item.product;
-        return existingReviews.some(
-          (r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId)
-        );
-      });
-    }
-    return hasShopReview && allProductsReviewed;
-  } catch (err) {
-    console.warn('Error checking order reviews eligibility:', err.message);
-    return false;
-  }
-};
-  const checkIfFullyReviewed = async (orderId, orderItems) => {
-    // First try to use cached reviews for this order to avoid stale GET after a POST
-    if (orderReviewsCache[orderId]) {
+    // Use cache unless explicitly skipping it
+    if (!skipCache && orderReviewsCache[orderId]) {
       const existingReviews = orderReviewsCache[orderId];
       const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
       let allProductsReviewed = true;
@@ -84,26 +43,32 @@ const checkIfFullyReviewed = async (orderId, orderItems, order) => {
         allProductsReviewed = orderItems.every((item) => {
           if (!item.product) return true;
           const pId = typeof item.product === 'object' ? item.product._id : item.product;
-          return existingReviews.some((r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId));
+          return existingReviews.some(
+            (r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId)
+          );
         });
       }
       return hasShopReview && allProductsReviewed;
     }
 
-    // Fallback to fresh GET if not cached
+    // Fallback – fetch fresh review data when cache miss or skipCache
     try {
       const res = await api.get(`/reviews/order/${orderId}`);
       if (!res || !res.success) return false;
       const existingReviews = res.data || [];
-      // Cache the result for future checks
-      setOrderReviewsCache((prev) => ({ ...prev, [orderId]: existingReviews }));
+      // Update cache for future calls (unless we are skipping to avoid race)
+      if (!skipCache) {
+        setOrderReviewsCache((prev) => ({ ...prev, [orderId]: existingReviews }));
+      }
       const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
       let allProductsReviewed = true;
       if (orderItems && orderItems.length > 0) {
         allProductsReviewed = orderItems.every((item) => {
           if (!item.product) return true;
           const pId = typeof item.product === 'object' ? item.product._id : item.product;
-          return existingReviews.some((r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId));
+          return existingReviews.some(
+            (r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId)
+          );
         });
       }
       return hasShopReview && allProductsReviewed;
@@ -112,6 +77,8 @@ const checkIfFullyReviewed = async (orderId, orderItems, order) => {
       return false;
     }
   };
+
+
 
   // Find the newest unreviewed delivered order
   const checkUnreviewedDeliveredOrders = useCallback(async () => {
@@ -135,7 +102,7 @@ const checkIfFullyReviewed = async (orderId, orderItems, order) => {
 
       // Check newest delivered orders first
       for (const candidateOrder of deliveredOrders) {
-        const isFullyReviewed = await checkIfFullyReviewed(candidateOrder._id, candidateOrder.items);
+        const isFullyReviewed = await checkIfFullyReviewed(candidateOrder._id, candidateOrder.items, candidateOrder, false);
         if (!isFullyReviewed) {
           setEligibleOrder(candidateOrder);
           return; // Show 1 modal at a time for the newest unreviewed order
@@ -201,7 +168,7 @@ const checkIfFullyReviewed = async (orderId, orderItems, order) => {
           return rest;
         });
         // Re-verify if order is now fully reviewed
-        const isFullyReviewed = await checkIfFullyReviewed(eligibleOrder._id, eligibleOrder.items);
+        const isFullyReviewed = await checkIfFullyReviewed(eligibleOrder._id, eligibleOrder.items, eligibleOrder, true);
         if (isFullyReviewed) {
           setEligibleOrder(null);
           // Check next eligible order
