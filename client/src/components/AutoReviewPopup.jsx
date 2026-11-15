@@ -135,16 +135,21 @@ export default function AutoReviewPopup() {
   };
 
   const handleReviewSubmitted = async () => {
-    if (eligibleOrder) {
-      // Re-verify if order is now fully reviewed
-      const isFullyReviewed = await checkIfFullyReviewed(eligibleOrder._id, eligibleOrder.items);
-      if (isFullyReviewed) {
-        setEligibleOrder(null);
-        // Check next eligible order
-        checkUnreviewedDeliveredOrders();
+      if (eligibleOrder) {
+        // Invalidate cache for this order to ensure fresh check after submission
+        setOrderReviewsCache((prev) => {
+          const { [eligibleOrder._id]: _, ...rest } = prev;
+          return rest;
+        });
+        // Re-verify if order is now fully reviewed
+        const isFullyReviewed = await checkIfFullyReviewed(eligibleOrder._id, eligibleOrder.items);
+        if (isFullyReviewed) {
+          setEligibleOrder(null);
+          // Check next eligible order
+          checkUnreviewedDeliveredOrders();
+        }
       }
-    }
-  };
+    };
 
   if (!eligibleOrder) return null;
 
