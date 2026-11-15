@@ -11,17 +11,15 @@ export default function AutoReviewPopup() {
   const [eligibleOrder, setEligibleOrder] = useState(null);
   const [dismissedOrderIds, setDismissedOrderIds] = useState([]);
   const isFetchingRef = useRef(false);
+  // Cache of fetched reviews per order to avoid stale GET after a POST
+  const [orderReviewsCache, setOrderReviewsCache] = useState({});
 
   // Check if a specific delivered order is fully reviewed across all targets
   const checkIfFullyReviewed = async (orderId, orderItems) => {
-    try {
-      const res = await api.get(`/reviews/order/${orderId}`);
-      if (!res || !res.success) return false;
-
-      const existingReviews = res.data || [];
+    // First try to use cached reviews for this order to avoid stale GET after a POST
+    if (orderReviewsCache[orderId]) {
+      const existingReviews = orderReviewsCache[orderId];
       const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
-      
-      // Check product reviews for all items in order
       let allProductsReviewed = true;
       if (orderItems && orderItems.length > 0) {
         allProductsReviewed = orderItems.every((item) => {
@@ -30,8 +28,25 @@ export default function AutoReviewPopup() {
           return existingReviews.some((r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId));
         });
       }
+      return hasShopReview && allProductsReviewed;
+    }
 
-      // If shop and all products in order are reviewed, consider it completed
+    // Fallback to fresh GET if not cached
+    try {
+      const res = await api.get(`/reviews/order/${orderId}`);
+      if (!res || !res.success) return false;
+      const existingReviews = res.data || [];
+      // Cache the result for future checks
+      setOrderReviewsCache((prev) => ({ ...prev, [orderId]: existingReviews }));
+      const hasShopReview = existingReviews.some((r) => r.type === 'SHOP');
+      let allProductsReviewed = true;
+      if (orderItems && orderItems.length > 0) {
+        allProductsReviewed = orderItems.every((item) => {
+          if (!item.product) return true;
+          const pId = typeof item.product === 'object' ? item.product._id : item.product;
+          return existingReviews.some((r) => r.type === 'PRODUCT' && String(r.product?._id || r.product) === String(pId));
+        });
+      }
       return hasShopReview && allProductsReviewed;
     } catch (err) {
       console.warn('Error checking order reviews eligibility:', err.message);

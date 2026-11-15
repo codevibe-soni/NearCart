@@ -55,30 +55,32 @@ const httpServer = http.createServer(app);
 // ===============================
 
 const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'https://near-cart.pages.dev/',
-  process.env.CLIENT_URL,
-].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
+  // Production frontend – explicit URL (no trailing slash)
+  process.env.CLIENT_URL || 'https://nearcart.pages.dev',
+  // Development localhost origins – only when not in production
+  ...(process.env.NODE_ENV !== 'production'
+    ? [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+      ]
+    : []),
+].map(origin => origin.replace(/\/$/, ''));
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin
-    if (
-      !origin ||
-      allowedOrigins.includes(origin) ||
-      process.env.NODE_ENV !== 'production'
-    ) {
-      callback(null, true);
-    } else {
-      // Currently allowing all origins
-      callback(null, true);
+    // Allow same‑origin requests or those in the whitelist
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    // Reject all others
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,
 };
+
+
 
 // ===============================
 // MIDDLEWARE

@@ -35,12 +35,14 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
   }, [isOpen, order]);
 
   const fetchOrderReviews = async () => {
+    setLoadingExisting(true);
+    setErrorMsg('');
     try {
-      setLoadingExisting(true);
-      setErrorMsg('');
       const res = await api.get(`/reviews/order/${order._id}`);
       if (res && res.success) {
         setExistingReviews(res.data || []);
+      } else {
+        setExistingReviews([]);
       }
     } catch (err) {
       console.error('Failed to load order reviews:', err);
@@ -78,9 +80,9 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
       });
 
       if (res && res.success) {
-        setSuccessMsg(`Review submitted successfully!`);
+        setSuccessMsg('Review submitted successfully!');
         await fetchOrderReviews();
-        if (onReviewSubmitted) onReviewSubmitted();
+        if (onReviewSubmitted) onReviewSubmitted(res.data);
       }
     } catch (err) {
       console.error('Review submit error:', err);
@@ -108,11 +110,7 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
               transition: 'transform 0.15s ease',
             }}
           >
-            <Star
-              size={24}
-              fill={star <= currentRating ? '#f59e0b' : 'none'}
-              strokeWidth={1.5}
-            />
+            <Star size={24} fill={star <= currentRating ? '#f59e0b' : 'none'} strokeWidth={1.5} />
           </button>
         ))}
         <span style={{ fontSize: '0.9rem', fontWeight: '700', marginLeft: '0.4rem', color: '#f59e0b' }}>
@@ -227,7 +225,7 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
 
           {loadingExisting ? (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <div className="spinner" style={{ margin: '0 auto 0.5rem auto' }}></div>
+              <div className="spinner" style={{ margin: '0 auto 0.5rem auto' }} />
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading review status...</p>
             </div>
           ) : (
@@ -248,7 +246,6 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
                       Shop: {shopDoc.name || 'Campus Shop'}
                     </h3>
                   </div>
-
                   {existingShopReview && (
                     <span
                       style={{
@@ -269,7 +266,7 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
                 </div>
 
                 {existingShopReview ? (
-                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)', italic: 'true' }}>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     "{existingShopReview.comment || 'No comment provided'}"
                   </p>
                 ) : (
@@ -325,7 +322,6 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
                         Delivery Partner: {deliveryBoy.name || 'Delivery Boy'}
                       </h3>
                     </div>
-
                     {existingDeliveryReview && (
                       <span
                         style={{
@@ -442,7 +438,6 @@ export default function RateOrderModal({ order, isOpen, onClose, onReviewSubmitt
                               </span>
                             )}
                           </div>
-
                           {existingPReview ? (
                             <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                               "{existingPReview.comment || 'No comment provided'}"

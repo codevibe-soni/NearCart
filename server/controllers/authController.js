@@ -13,7 +13,7 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
   );
 
   const cookieName = process.env.COOKIE_NAME || 'campuscart_token';
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || !process.env.NODE_ENV;
   const maxAgeMs = 15 * 24 * 60 * 60 * 1000; // 15 days
 
   const options = {
@@ -369,7 +369,7 @@ export const login = async (req, res, next) => {
 export const logout = async (req, res, next) => {
   try {
     const cookieName = process.env.COOKIE_NAME || 'campuscart_token';
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true' || !process.env.NODE_ENV;
 
     res.cookie(cookieName, '', {
       httpOnly: true,
